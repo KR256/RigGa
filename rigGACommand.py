@@ -17,6 +17,7 @@
 
 import sys
 import maya.api.OpenMaya as om
+import commandFunctionality
 
 def maya_useNewAPI():
     """
@@ -25,37 +26,29 @@ def maya_useNewAPI():
     """
     pass
 
-class PyHelloWorldCmd(om.MPxCommand):
-    kPluginCmdName = "rigGACommand"
-    def __init__(self):
-        om.MPxCommand.__init__(self)
+kPluginCmdName = "rigGACommand"
 
-    @staticmethod
-    def cmdCreator():
-        return PyHelloWorldCmd()
-    def doIt(self, args):
-        print "Hello World!"
+##########################################################
+# Plug-in initialization.
+##########################################################
+def cmdCreator():
+    ''' Creates an instance of our command class. '''
+    return commandFunctionality.printPathsCmd()
 
-# Initialize the plug-in
-def initializePlugin(plugin):
-    pluginFn = om.MFnPlugin(plugin)
+
+def initializePlugin(mobject):
+    ''' Initializes the plug-in.'''
+    mplugin = om.MFnPlugin(mobject)
     try:
-        pluginFn.registerCommand(
-            PyHelloWorldCmd.kPluginCmdName, PyHelloWorldCmd.cmdCreator
-        )
+        mplugin.registerCommand(kPluginCmdName, cmdCreator)
     except:
-        sys.stderr.write(
-            "Failed to register command: %s\n" % PyHelloWorldCmd.kPluginCmdName
-        )
-        raise
+        sys.stderr.write("Failed to register command: %s\n" % kPluginCmdName)
 
-# Uninitialize the plug-in
-def uninitializePlugin(plugin):
-    pluginFn = om.MFnPlugin(plugin)
+
+def uninitializePlugin(mobject):
+    ''' Uninitializes the plug-in '''
+    mplugin = om.MFnPlugin(mobject)
     try:
-        pluginFn.deregisterCommand(PyHelloWorldCmd.kPluginCmdName)
+        mplugin.deregisterCommand(kPluginCmdName)
     except:
-        sys.stderr.write(
-            "Failed to unregister command: %s\n" % PyHelloWorldCmd.kPluginCmdName
-        )
-        raise
+        sys.stderr.write("Failed to unregister command: %s\n" % kPluginCmdName)
