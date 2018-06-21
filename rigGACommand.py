@@ -33,7 +33,7 @@ kPluginCmdName = "rigGACommand"
 ##########################################################
 def cmdCreator():
     ''' Creates an instance of our command class. '''
-    return commandFunctionality.printPathsCmd()
+    return commandFunctionality.Main()
 
 
 def initializePlugin(mobject):
