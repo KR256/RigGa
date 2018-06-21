@@ -1,5 +1,6 @@
 import sys
 import maya.api.OpenMaya as om
+import maya.cmds as cmds
 
 ##########################################################
 # Plug-in
@@ -13,16 +14,17 @@ class Main(om.MPxCommand):
     def doIt(self, args):
 
         # Skeleton working stub
-        print "Stub In 2"
+        print "Stub In 9"
+
 
         selectionList = om.MGlobal.getActiveSelectionList()
         dagIterator = om.MItSelectionList(selectionList, om.MFn.kDagNode)
 
-        CTL_groups_list = self.createCTLgroupsList(dagIterator)
+        self.createCTLgroupsList(dagIterator)
 
 
         # Skeleton working stub
-        print "Stub 2"
+        print "Stub 9"
 
         # # API 1.0
         # selectionList = om.MSelectionList()
@@ -37,46 +39,38 @@ class Main(om.MPxCommand):
                 "ERROR: No CTL groups selected. Select in Outliner View\n"
             )
 
+        CTL_GROUP_OPTIONS = ['eye', 'brow', 'mouth', 'lower', 'upper', 'nose', 'ear', 'neck', 'chin', 'lip']
+
+
         dagPath = om.MDagPath()
-
-        # Perform each iteration.
-
-        # Print the paths of the selected DAG objects.
-        print '======================='
-        print ' SELECTED DAG OBJECTS: '
-        print '======================='
 
         while (not pSelectionListIterator.isDone()):
             # Populate our MDagPath object. This will likely provide
             # us with a Transform node.
             dagPath = pSelectionListIterator.getDagPath()
-            self.printDagNodeInfo(dagPath)
+            print dagPath
+            dagPathStr = str(dagPath)
+            print dagPathStr
+            # self.printDagNodeInfo(dagPath)
 
+            # Change Group name to a shorter name
+            for cName in CTL_GROUP_OPTIONS:
+                if cName in dagPathStr:
+                    selectedGroupShort = cName
+            print "New group name:%s" % selectedGroupShort
 
-            # verticleDagIterator = om.MItDag(om.MItDag.kDepthFirst,
-            #                               om.MFn.kTransform)
+            # Get all Controllers
+            leafTransformsLong = cmds.ls(dagPathStr, long=True, dag=True, allPaths=True, leaf=True)
+
+            for leaf in leafTransformsLong:
+                longName = leaf[:leaf.rfind('|')]
+                shortName = leaf[leaf.rfind('|') + 1:leaf.find('Shape')]
+                nodeRef = cmds.listConnections(longName, destination=True, source=False, t="blendShape")
+                if nodeRef:
+                    print shortName
+
 
             # Advance to the next item
             pSelectionListIterator.next()
 
-        print '====================='
 
-    def printDagNodeInfo(self, dPath):
-        # Obtain the name of the object.
-
-        # Obtain a reference to MFnDag function set to print the name of the DAG object
-        dagFn = om.MFnDagNode()
-        dagObject = dPath.node()
-
-        dagFn.setObject(dagObject)
-        name = dagFn.name()
-
-        # Obtain the compatible function sets for this DAG object.
-        # These values refer to the enumeration values of MFn
-        fntypes = []
-        fntypes = om.MGlobal.getFunctionSetList(dagObject)
-
-        # Print the DAG object information.
-        print name + ' (' + dagObject.apiTypeStr + ')'
-        print '\tDAG path: [' + str(dPath.fullPathName()) + ']'
-        print '\tCompatible function sets: ' + str(fntypes)
