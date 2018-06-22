@@ -4,7 +4,7 @@ import maya.cmds as cmds
 
 class CTLnode():
 
-    def __init__(self,longname):
+    def __init__(self,longname, selectedGroupShort):
         ''' Constructor. '''
         self.DAGpath = longname
         self.name = longname[longname.rfind('|') + 1:]
@@ -12,10 +12,40 @@ class CTLnode():
         self.maxXYZ = cmds.getAttr(longname + '.maxTransLimit')
         self.weight = cmds.getAttr(longname + '.translate')
         self.startingWeight = cmds.getAttr(longname + '.translate')
+        self.groupName = selectedGroupShort
 
     def __str__(self):
-        return "CTLnode: %s, Val: %s" % (self.name, self.weight)
+        return "Group: %s CTL: %s, Val: %s" % (self.groupName, self.name, self.weight)
 
+
+class GUI():
+
+    def __init__(self, CTL_TREE):
+
+        self.ctlTree = CTL_TREE
+
+        winID = 'rigUI'
+
+        if cmds.window(winID, exists=True):
+            cmds.deleteUI(winID)
+        cmds.window(winID)
+
+        cmds.columnLayout("columnLayout")
+
+        # Add controls into this Layout
+        cmds.text(label="Mutate Rate Lower:")
+        mRateLower = cmds.floatField("mRateLower", minValue=0.0, maxValue=1.0, value=0.0, editable=True,
+                                      parent="columnLayout")
+        cmds.text(label="Mutate Rate Upper:")
+        mRateUpper = cmds.floatField("mRateUpper", minValue=0.0, maxValue=1.0, value=0.0, editable=True,
+                                      parent="columnLayout")
+        cmds.button(label='Random', command='randomMizeCTLs(mRateLower,mRateUpper)')
+
+        # Display the window
+        cmds.showWindow()
+
+    def randomMizeCTLs(self, mRateLower, mRateUpper):
+        print "Randomise"
 
 ##########################################################
 # Plug-in
@@ -32,17 +62,21 @@ class Main(om.MPxCommand):
         argVals = self.parseArguments(args)
 
         # Skeleton working stub
-        print "Stub In 4"
+        print "Stub In 7"
 
 
         selectionList = om.MGlobal.getActiveSelectionList()
         dagIterator = om.MItSelectionList(selectionList, om.MFn.kDagNode)
 
-        self.createCTLgroupsList(dagIterator, argVals)
+        CTL_TREE = self.createCTLgroupsList(dagIterator, argVals)
+
+        guiTemp = GUI(CTL_TREE)
+
+        print CTL_TREE
 
 
         # Skeleton working stub
-        print "Stub 4"
+        print "Stub 7"
 
         # # API 1.0
         # selectionList = om.MSelectionList()
@@ -86,7 +120,7 @@ class Main(om.MPxCommand):
 
 
         dagPath = om.MDagPath()
-
+        CTL_TREE = {}
         while (not pSelectionListIterator.isDone()):
             # Populate our MDagPath object. This will likely provide
             # us with a Transform node.
@@ -105,16 +139,19 @@ class Main(om.MPxCommand):
             # Get all Controllers
             leafTransformsLong = cmds.ls(dagPathStr, long=True, dag=True, allPaths=True, leaf=True)
 
+            CTLgroup = []
             for leaf in leafTransformsLong:
                 longName = leaf[:leaf.rfind('|')]
                 shortName = leaf[leaf.rfind('|') + 1:leaf.find('Shape')]
                 if ctlIdString in shortName:
-                    tempNode = CTLnode(longName)
+                    tempNode = CTLnode(longName, selectedGroupShort)
                     print tempNode
+                    CTLgroup.append(tempNode)
 
-
-
-            # Advance to the next item
+            # Add to Tree and advance to the next item
+            CTL_TREE[selectedGroupShort] = CTLgroup
             pSelectionListIterator.next()
+
+        return CTL_TREE
 
 
