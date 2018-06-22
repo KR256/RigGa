@@ -27,6 +27,8 @@ def maya_useNewAPI():
     pass
 
 kPluginCmdName = "rigGACommand"
+kShortFlagName = '-cis'
+kLongFlagName = '-controllerIdentifierString'
 
 ##########################################################
 # Plug-in initialization.
@@ -36,11 +38,23 @@ def cmdCreator():
     return commandFunctionality.Main()
 
 
+def syntaxCreator():
+    ''' Defines the argument and flag syntax for this command. '''
+    syntax = om.MSyntax()
+
+    # In this example, our flag will be expecting a numeric value, denoted by OpenMaya.MSyntax.kDouble.
+    syntax.addFlag(kShortFlagName, kLongFlagName, om.MSyntax.kString)
+
+    # ... Add more flags here ...
+
+    return syntax
+
+
 def initializePlugin(mobject):
     ''' Initializes the plug-in.'''
     mplugin = om.MFnPlugin(mobject)
     try:
-        mplugin.registerCommand(kPluginCmdName, cmdCreator)
+        mplugin.registerCommand(kPluginCmdName, cmdCreator, syntaxCreator )
     except:
         sys.stderr.write("Failed to register command: %s\n" % kPluginCmdName)
 
