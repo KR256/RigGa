@@ -1,6 +1,8 @@
 import sys
 import maya.api.OpenMaya as om
 import maya.cmds as cmds
+import random
+from functools import partial
 
 class CTLnode():
 
@@ -8,14 +10,36 @@ class CTLnode():
         ''' Constructor. '''
         self.DAGpath = longname
         self.name = longname[longname.rfind('|') + 1:]
-        self.minXYZ = cmds.getAttr(longname + '.minTransLimit')
-        self.maxXYZ = cmds.getAttr(longname + '.maxTransLimit')
-        self.weight = cmds.getAttr(longname + '.translate')
-        self.startingWeight = cmds.getAttr(longname + '.translate')
+        tempMinXYZ = cmds.getAttr(longname + '.minTransLimit')
+        tempMaxXYZ = cmds.getAttr(longname + '.maxTransLimit')
+        tempWeight = cmds.getAttr(longname + '.translate')
+        weightDict = {}
+        weightMinMaxDict = {}
+        try:
+            cmds.setAttr(longname + '.translateX', tempWeight[0][0])
+            weightDict['translateX'] = tempWeight[0][0]
+            weightMinMaxDict['translateX'] = (tempMinXYZ[0][0], tempMaxXYZ[0][0])
+        except:
+            pass
+        try:
+            cmds.setAttr(longname + '.translateY', tempWeight[0][1])
+            weightDict['translateY'] = tempWeight[0][1]
+            weightMinMaxDict['translateY'] = (tempMinXYZ[0][1], tempMaxXYZ[0][1])
+        except:
+            pass
+
+        self.weight = weightDict
+        self.startingWeight = weightDict
         self.groupName = selectedGroupShort
+        self.weightMinMax = weightMinMaxDict
 
     def __str__(self):
         return "Group: %s CTL: %s, Val: %s" % (self.groupName, self.name, self.weight)
+
+    def setWeight(self, newWeight):
+
+        for id,key in enumerate(self.weight):
+            cmds.setAttr(self.DAGpath + '.' + key, newWeight[id])
 
 
 class GUI():
@@ -28,7 +52,7 @@ class GUI():
 
         if cmds.window(winID, exists=True):
             cmds.deleteUI(winID)
-        cmds.window(winID)
+        cmds.window(winID, width = 100, height = 100)
 
         cmds.columnLayout("columnLayout")
 
@@ -39,13 +63,30 @@ class GUI():
         cmds.text(label="Mutate Rate Upper:")
         mRateUpper = cmds.floatField("mRateUpper", minValue=0.0, maxValue=1.0, value=0.0, editable=True,
                                       parent="columnLayout")
-        cmds.button(label='Random', command='randomMizeCTLs(mRateLower,mRateUpper)')
+        cmds.button(label='Random', command=partial(self.randomMizeCTLs,mRateLower,mRateUpper))
 
         # Display the window
         cmds.showWindow()
 
-    def randomMizeCTLs(self, mRateLower, mRateUpper):
+    def randomMizeCTLs(self, mRateLower, mRateUpper, *args):
         print "Randomise"
+
+        lowerLim = cmds.floatField(mRateLower, query=True, value=True)
+        upperLim = cmds.floatField(mRateUpper, query=True, value=True)
+
+        for key, value in self.ctlTree.iteritems():
+            print "CTL GROUP: %s" % key
+            for ctlNode in value:
+                print ctlNode
+                currentWeight = ctlNode.weight
+                minMaxWeight = ctlNode.weightMinMax
+                randVals = []
+                for k2, v2 in currentWeight.iteritems():
+                    randVal = v2 + random.uniform(lowerLim, upperLim)
+                    randVals.append(randVal)
+                #random.uniform(mRateLower, mRateLower)
+                ctlNode.setWeight(randVals)
+
 
 ##########################################################
 # Plug-in
@@ -62,7 +103,7 @@ class Main(om.MPxCommand):
         argVals = self.parseArguments(args)
 
         # Skeleton working stub
-        print "Stub In 7"
+        print "Stub In 6"
 
 
         selectionList = om.MGlobal.getActiveSelectionList()
@@ -72,11 +113,9 @@ class Main(om.MPxCommand):
 
         guiTemp = GUI(CTL_TREE)
 
-        print CTL_TREE
-
 
         # Skeleton working stub
-        print "Stub 7"
+        print "Stub 6"
 
         # # API 1.0
         # selectionList = om.MSelectionList()
