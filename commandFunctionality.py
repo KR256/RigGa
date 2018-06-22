@@ -103,7 +103,7 @@ class Main(om.MPxCommand):
         argVals = self.parseArguments(args)
 
         # Skeleton working stub
-        print "Stub In 6"
+        print "Stub In 7"
 
 
         selectionList = om.MGlobal.getActiveSelectionList()
@@ -115,7 +115,7 @@ class Main(om.MPxCommand):
 
 
         # Skeleton working stub
-        print "Stub 6"
+        print "Stub 7"
 
         # # API 1.0
         # selectionList = om.MSelectionList()
