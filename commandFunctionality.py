@@ -6,40 +6,48 @@ from functools import partial
 
 class CTLnode():
 
-    def __init__(self,longname, selectedGroupShort):
+    def __init__(self,longname, translateName, weightDict, weightMinMax,shortGroupName):
         ''' Constructor. '''
         self.DAGpath = longname
         self.name = longname[longname.rfind('|') + 1:]
-        tempMinXYZ = cmds.getAttr(longname + '.minTransLimit')
-        tempMaxXYZ = cmds.getAttr(longname + '.maxTransLimit')
-        tempWeight = cmds.getAttr(longname + '.translate')
-        weightDict = {}
-        weightMinMaxDict = {}
-        try:
-            cmds.setAttr(longname + '.translateX', tempWeight[0][0])
-            weightDict['translateX'] = tempWeight[0][0]
-            weightMinMaxDict['translateX'] = (tempMinXYZ[0][0], tempMaxXYZ[0][0])
-        except:
-            pass
-        try:
-            cmds.setAttr(longname + '.translateY', tempWeight[0][1])
-            weightDict['translateY'] = tempWeight[0][1]
-            weightMinMaxDict['translateY'] = (tempMinXYZ[0][1], tempMaxXYZ[0][1])
-        except:
-            pass
+        self.translateName = self.name + '.' + translateName
 
         self.weight = weightDict
         self.startingWeight = weightDict
-        self.groupName = selectedGroupShort
-        self.weightMinMax = weightMinMaxDict
+        self.groupName = shortGroupName
+        self.weightMinMax = weightMinMax
 
     def __str__(self):
         return "Group: %s CTL: %s, Val: %s" % (self.groupName, self.name, self.weight)
 
+    @staticmethod
+    def createCTLNodePerTranslate(longname,shortGroupName):
+
+        tempMinXYZ = cmds.getAttr(longname + '.minTransLimit')
+        tempMaxXYZ = cmds.getAttr(longname + '.maxTransLimit')
+        tempWeight = cmds.getAttr(longname + '.translate')
+
+        translateCTLs = []
+        try:
+            cmds.setAttr(longname + '.translateX', tempWeight[0][0])
+            weightDict = tempWeight[0][0]
+            weightMinMax = (tempMinXYZ[0][0], tempMaxXYZ[0][0])
+            translateCTLs.append(CTLnode(longname, 'translateX', weightDict, weightMinMax,shortGroupName))
+        except:
+            pass
+        try:
+            cmds.setAttr(longname + '.translateY', tempWeight[0][1])
+            weightDict = tempWeight[0][1]
+            weightMinMax = (tempMinXYZ[0][1], tempMaxXYZ[0][1])
+            translateCTLs.append(CTLnode(longname, 'translateY', weightDict, weightMinMax,shortGroupName))
+        except:
+            pass
+
+        return translateCTLs
+
     def setWeight(self, newWeight):
 
-        for id,key in enumerate(self.weight):
-            cmds.setAttr(self.DAGpath + '.' + key, newWeight[id])
+        cmds.setAttr(self.translateName, newWeight)
 
 
 class GUI():
@@ -77,15 +85,12 @@ class GUI():
         for key, value in self.ctlTree.iteritems():
             print "CTL GROUP: %s" % key
             for ctlNode in value:
-                print ctlNode
+                #print ctlNode
                 currentWeight = ctlNode.weight
                 minMaxWeight = ctlNode.weightMinMax
-                randVals = []
-                for k2, v2 in currentWeight.iteritems():
-                    randVal = v2 + random.uniform(lowerLim, upperLim)
-                    randVals.append(randVal)
+                randVal = currentWeight + random.uniform(lowerLim, upperLim)
                 #random.uniform(mRateLower, mRateLower)
-                ctlNode.setWeight(randVals)
+                ctlNode.setWeight(randVal)
 
 
 ##########################################################
@@ -99,23 +104,33 @@ class Main(om.MPxCommand):
 
     def doIt(self, args):
 
+        # Skeleton working stub
+        print "Stub In 3"
+
         # We recommend parsing your arguments first.
         argVals = self.parseArguments(args)
+        ctlId = argVals[0]
+        neutralId = argVals[1]
 
-        # Skeleton working stub
-        print "Stub In 7"
+        print "Args... CTLid: %s neutralFrame %i\n" % (ctlId,neutralId)
+
+
 
 
         selectionList = om.MGlobal.getActiveSelectionList()
         dagIterator = om.MItSelectionList(selectionList, om.MFn.kDagNode)
 
-        CTL_TREE = self.createCTLgroupsList(dagIterator, argVals)
+        CTL_TREE = self.createCTLgroupsList(dagIterator, ctlId)
+
+        allCurrentVals = self.getNodeWeightList(CTL_TREE)
+
+        print "allCurrentVals: %s" % allCurrentVals
 
         guiTemp = GUI(CTL_TREE)
 
 
         # Skeleton working stub
-        print "Stub 7"
+        print "Stub 3"
 
         # # API 1.0
         # selectionList = om.MSelectionList()
@@ -128,22 +143,31 @@ class Main(om.MPxCommand):
         command code.
         '''
 
-        kShortFlagName = '-cis'
-        kLongFlagName = '-controllerIdentifierString'
+        ctlShortFlagName = '-cis'
+        ctlLongFlagName = '-controllerIdentifierString'
+        neutralShortFlagName = '-nf'
+        neutralLongFlagName = '-neutralFrame'
 
         # The following MArgParser object allows you to check if specific flags are set.
         argData = om.MArgParser(self.syntax(), args)
         print "argData: %s" % argData
 
-        if argData.isFlagSet(kShortFlagName):
+        noFlag = True
+        flagParams = []
+        if argData.isFlagSet(ctlShortFlagName):
             # In this case, we print the passed flags's three parameters, indexed from 0 to 2.
-            flagParam0 = argData.flagArgumentString(kShortFlagName, 0)
-        else:
+            flagParams.append(argData.flagArgumentString(ctlShortFlagName, 0))
+            noFlag = False
+        if argData.isFlagSet(neutralLongFlagName):
+            # In this case, we print the passed flags's three parameters, indexed from 0 to 2.
+            flagParams.append(argData.flagArgumentDouble(neutralLongFlagName, 0))
+            noFlag = False
+        if noFlag:
             sys.stderr.write(
                 "ERROR: No Control Identifier String Provided with function call e.g -cis 'CTL'\n"
             )
 
-        return flagParam0
+        return flagParams
 
 
     def createCTLgroupsList(self, pSelectionListIterator, ctlIdString):
@@ -183,9 +207,10 @@ class Main(om.MPxCommand):
                 longName = leaf[:leaf.rfind('|')]
                 shortName = leaf[leaf.rfind('|') + 1:leaf.find('Shape')]
                 if ctlIdString in shortName:
-                    tempNode = CTLnode(longName, selectedGroupShort)
-                    print tempNode
-                    CTLgroup.append(tempNode)
+                    tempNode = CTLnode.createCTLNodePerTranslate(longName, selectedGroupShort)
+                    for node in tempNode:
+                        print node
+                        CTLgroup.append(node)
 
             # Add to Tree and advance to the next item
             CTL_TREE[selectedGroupShort] = CTLgroup
@@ -193,4 +218,17 @@ class Main(om.MPxCommand):
 
         return CTL_TREE
 
+
+    def getNodeWeightList(self, CTL_tree):
+
+
+        groupDict = {}
+        for key,group in CTL_tree.iteritems():
+            nodeDict = {}
+            for node in group:
+                nodeDict[node.translateName] = node.weight
+
+            groupDict[key] = nodeDict
+
+        return groupDict
 

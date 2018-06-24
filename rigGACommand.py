@@ -27,8 +27,7 @@ def maya_useNewAPI():
     pass
 
 kPluginCmdName = "rigGACommand"
-kShortFlagName = '-cis'
-kLongFlagName = '-controllerIdentifierString'
+
 
 ##########################################################
 # Plug-in initialization.
@@ -40,10 +39,15 @@ def cmdCreator():
 
 def syntaxCreator():
     ''' Defines the argument and flag syntax for this command. '''
+    ctlShortFlagName = '-cis'
+    ctlLongFlagName = '-controllerIdentifierString'
+    neutralShortFlagName = '-nf'
+    neutralLongFlagName = '-neutralFrame'
     syntax = om.MSyntax()
 
     # In this example, our flag will be expecting a numeric value, denoted by OpenMaya.MSyntax.kDouble.
-    syntax.addFlag(kShortFlagName, kLongFlagName, om.MSyntax.kString)
+    syntax.addFlag(ctlShortFlagName, ctlLongFlagName, om.MSyntax.kString)
+    syntax.addFlag(neutralShortFlagName, neutralLongFlagName, om.MSyntax.kDouble)
 
     # ... Add more flags here ...
 
