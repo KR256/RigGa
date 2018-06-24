@@ -48,6 +48,7 @@ class CTLnode():
     def setWeight(self, newWeight):
 
         cmds.setAttr(self.translateName, newWeight)
+        self.weight = newWeight
 
 
 class GUI():
@@ -69,46 +70,57 @@ class GUI():
 
         # Add controls into this Layout
         cmds.text(label="Mutate Rate Lower:")
-        mRateLower = cmds.floatField("mRateLower", minValue=0.0, maxValue=1.0, value=0.0, editable=True,
+        numShapes = cmds.intField("numShapes", minValue=1, maxValue=10, value=3, editable=True,
                                       parent="columnLayout")
         cmds.text(label="Mutate Rate Upper:")
-        mRateUpper = cmds.floatField("mRateUpper", minValue=0.0, maxValue=1.0, value=0.0, editable=True,
+        mRateUpper = cmds.floatField("mRateUpper", minValue=0.0, maxValue=1.0, value=0.25, editable=True,
                                       parent="columnLayout")
         cmds.text(label="Constrain to Active Shapes:")
         constrainFlag = cmds.checkBox(label='constrainFlag', align='right', editable=True)
-        cmds.button(label='Random', command=partial(self.randomMizeCTLs,mRateLower,mRateUpper,constrainFlag))
+        cmds.button(label='Random', command=partial(self.randomMizeCTLs,numShapes,mRateUpper,constrainFlag))
         cmds.button(label='Reset To Starting', command=partial(self.setCTLTreeTo, allStartingWeights))
         cmds.button(label='Reset To Neutral', command=partial(self.setCTLTreeTo, allNeutralWeights))
 
         # Display the window
         cmds.showWindow()
 
-    def randomMizeCTLs(self, mRateLower, mRateUpper, cFlag, *args):
+    def randomMizeCTLs(self, numShapes, mRateUpper, cFlag, *args):
         print "Randomise"
 
-        lowerLim = cmds.floatField(mRateLower, query=True, value=True)
+        self.setCTLTreeTo(self.allStartingWeights)
+
+        numSampleShapes = cmds.intField(numShapes, query=True, value=True)
         upperLim = cmds.floatField(mRateUpper, query=True, value=True)
         constrainFlag = cmds.checkBox(cFlag, query=True, value=True)
 
         if constrainFlag:
             for key, value in self.strongestShapes.iteritems():
-                for sortedTuple in value:
-                    currentNode = self.ctlTree[key][sortedTuple[0]]
-                    print currentNode
+                if not value:
+                    continue
+                randKeys = random.sample(list(value), min(numSampleShapes,len(value)))
+                print randKeys
+                for sortedTupleKey in randKeys:
+                    currentNode = self.ctlTree[key][sortedTupleKey[0]]
                     currentWeight = currentNode.weight
                     randWeight = random.gauss(currentWeight,upperLim)
-                    self.ctlTree[key][sortedTuple[0]].setWeight(randWeight)
+                    print currentNode
+                    self.ctlTree[key][sortedTupleKey[0]].setWeight(randWeight)
+                    print currentNode
 
-        #else:
-            # for key, value in self.ctlTree.iteritems():
-            #     print "CTL GROUP: %s" % key
-            #     for ctlNode in value:
-            #         #print ctlNode
-            #         currentWeight = ctlNode.weight
-            #         minMaxWeight = ctlNode.weightMinMax
-            #         randVal = currentWeight + random.uniform(lowerLim, upperLim)
-            #         #random.uniform(mRateLower, mRateLower)
-            #         ctlNode.setWeight(randVal)
+
+        else:
+            for key, value in self.ctlTree.iteritems():
+                print "CTL GROUP: %s" % key
+                randKeys = random.sample(list(value),min(numSampleShapes,len(value)))
+                print randKeys
+                for ctlNode in randKeys:
+                    #print ctlNode
+                    currentNode = self.ctlTree[key][ctlNode]
+                    currentWeight = currentNode.weight
+                    randWeight = random.gauss(currentWeight, upperLim)
+                    print currentNode
+                    self.ctlTree[key][ctlNode].setWeight(randWeight)
+                    print currentNode
 
     def setCTLTreeTo(self, weightTree, *args):
         for groupKey, groupNode in self.ctlTree.iteritems():
@@ -131,7 +143,7 @@ class Main(om.MPxCommand):
     def doIt(self, args):
 
         # Skeleton working stub
-        print "Stub In 3"
+        print "Stub In 5"
 
         # We recommend parsing your arguments first.
         argVals = self.parseArguments(args)
