@@ -52,9 +52,12 @@ class CTLnode():
 
 class GUI():
 
-    def __init__(self, CTL_TREE,allStartingWeights,allNeutralWeights):
+    def __init__(self, CTL_TREE,allStartingWeights,allNeutralWeights,strongestShapes):
 
         self.ctlTree = CTL_TREE
+        self.allStartingWeights = allStartingWeights
+        self.allNeutralWeights = allNeutralWeights
+        self.strongestShapes = strongestShapes
 
         winID = 'rigUI'
 
@@ -71,32 +74,45 @@ class GUI():
         cmds.text(label="Mutate Rate Upper:")
         mRateUpper = cmds.floatField("mRateUpper", minValue=0.0, maxValue=1.0, value=0.0, editable=True,
                                       parent="columnLayout")
-        cmds.button(label='Random', command=partial(self.randomMizeCTLs,mRateLower,mRateUpper))
+        cmds.text(label="Constrain to Active Shapes:")
+        constrainFlag = cmds.checkBox(label='constrainFlag', align='right', editable=True)
+        cmds.button(label='Random', command=partial(self.randomMizeCTLs,mRateLower,mRateUpper,constrainFlag))
         cmds.button(label='Reset To Starting', command=partial(self.setCTLTreeTo, allStartingWeights))
         cmds.button(label='Reset To Neutral', command=partial(self.setCTLTreeTo, allNeutralWeights))
 
         # Display the window
         cmds.showWindow()
 
-    def randomMizeCTLs(self, mRateLower, mRateUpper, *args):
+    def randomMizeCTLs(self, mRateLower, mRateUpper, cFlag, *args):
         print "Randomise"
 
         lowerLim = cmds.floatField(mRateLower, query=True, value=True)
         upperLim = cmds.floatField(mRateUpper, query=True, value=True)
+        constrainFlag = cmds.checkBox(cFlag, query=True, value=True)
 
-        for key, value in self.ctlTree.iteritems():
-            print "CTL GROUP: %s" % key
-            for ctlNode in value:
-                #print ctlNode
-                currentWeight = ctlNode.weight
-                minMaxWeight = ctlNode.weightMinMax
-                randVal = currentWeight + random.uniform(lowerLim, upperLim)
-                #random.uniform(mRateLower, mRateLower)
-                ctlNode.setWeight(randVal)
+        if constrainFlag:
+            for key, value in self.strongestShapes.iteritems():
+                for sortedTuple in value:
+                    currentNode = self.ctlTree[key][sortedTuple[0]]
+                    print currentNode
+                    currentWeight = currentNode.weight
+                    randWeight = random.gauss(currentWeight,upperLim)
+                    self.ctlTree[key][sortedTuple[0]].setWeight(randWeight)
+
+        #else:
+            # for key, value in self.ctlTree.iteritems():
+            #     print "CTL GROUP: %s" % key
+            #     for ctlNode in value:
+            #         #print ctlNode
+            #         currentWeight = ctlNode.weight
+            #         minMaxWeight = ctlNode.weightMinMax
+            #         randVal = currentWeight + random.uniform(lowerLim, upperLim)
+            #         #random.uniform(mRateLower, mRateLower)
+            #         ctlNode.setWeight(randVal)
 
     def setCTLTreeTo(self, weightTree, *args):
         for groupKey, groupNode in self.ctlTree.iteritems():
-            for ctlNode in groupNode:
+            for nodeKey,ctlNode in groupNode.iteritems():
                 newWeight = weightTree[groupKey][ctlNode.translateName]
                 ctlNode.setWeight(newWeight)
 
@@ -115,7 +131,7 @@ class Main(om.MPxCommand):
     def doIt(self, args):
 
         # Skeleton working stub
-        print "Stub In 2"
+        print "Stub In 3"
 
         # We recommend parsing your arguments first.
         argVals = self.parseArguments(args)
@@ -146,7 +162,7 @@ class Main(om.MPxCommand):
 
         print strongestShapes
 
-        guiTemp = GUI(CTL_TREE,allStartingWeights,allNeutralWeights)
+        guiTemp = GUI(CTL_TREE,allStartingWeights,allNeutralWeights,strongestShapes)
 
 
         # Skeleton working stub
@@ -222,7 +238,7 @@ class Main(om.MPxCommand):
             # Get all Controllers
             leafTransformsLong = cmds.ls(dagPathStr, long=True, dag=True, allPaths=True, leaf=True)
 
-            CTLgroup = []
+            CTLgroup = {}
             for leaf in leafTransformsLong:
                 longName = leaf[:leaf.rfind('|')]
                 shortName = leaf[leaf.rfind('|') + 1:leaf.find('Shape')]
@@ -230,7 +246,8 @@ class Main(om.MPxCommand):
                     tempNode = CTLnode.createCTLNodePerTranslate(longName, selectedGroupShort)
                     for node in tempNode:
                         print node
-                        CTLgroup.append(node)
+                        keyName = node.translateName
+                        CTLgroup[keyName] = node
 
             # Add to Tree and advance to the next item
             CTL_TREE[selectedGroupShort] = CTLgroup
@@ -245,7 +262,7 @@ class Main(om.MPxCommand):
         groupDict = {}
         for key,group in CTL_tree.iteritems():
             nodeDict = {}
-            for node in group:
+            for key2, node in group.iteritems():
                 nodeDict[node.translateName] = node.weight
 
             groupDict[key] = nodeDict
@@ -260,7 +277,7 @@ class Main(om.MPxCommand):
         groupDict = {}
         for key,group in CTL_tree.iteritems():
             nodeDict = {}
-            for node in group:
+            for key2, node in group.iteritems():
                 attrWeight = cmds.getAttr(node.translateName)
                 nodeDict[node.translateName] = attrWeight
 
