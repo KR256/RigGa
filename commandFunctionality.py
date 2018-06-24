@@ -52,7 +52,7 @@ class CTLnode():
 
 class GUI():
 
-    def __init__(self, CTL_TREE):
+    def __init__(self, CTL_TREE,allStartingWeights,allNeutralWeights):
 
         self.ctlTree = CTL_TREE
 
@@ -72,6 +72,8 @@ class GUI():
         mRateUpper = cmds.floatField("mRateUpper", minValue=0.0, maxValue=1.0, value=0.0, editable=True,
                                       parent="columnLayout")
         cmds.button(label='Random', command=partial(self.randomMizeCTLs,mRateLower,mRateUpper))
+        cmds.button(label='Reset To Starting', command=partial(self.setCTLTreeTo, allStartingWeights))
+        cmds.button(label='Reset To Neutral', command=partial(self.setCTLTreeTo, allNeutralWeights))
 
         # Display the window
         cmds.showWindow()
@@ -92,6 +94,12 @@ class GUI():
                 #random.uniform(mRateLower, mRateLower)
                 ctlNode.setWeight(randVal)
 
+    def setCTLTreeTo(self, weightTree, *args):
+        for groupKey, groupNode in self.ctlTree.iteritems():
+            for ctlNode in groupNode:
+                newWeight = weightTree[groupKey][ctlNode.translateName]
+                ctlNode.setWeight(newWeight)
+
 
 ##########################################################
 # Plug-in
@@ -101,18 +109,20 @@ class Main(om.MPxCommand):
     def __init__(self):
         ''' Constructor. '''
         om.MPxCommand.__init__(self)
+        self.NEUTRAL_TIME = 0
+        self.STARTING_TIME = 0
 
     def doIt(self, args):
 
         # Skeleton working stub
-        print "Stub In 3"
+        print "Stub In 9"
 
         # We recommend parsing your arguments first.
         argVals = self.parseArguments(args)
         ctlId = argVals[0]
-        neutralId = argVals[1]
+        self.NEUTRAL_TIME = argVals[1]
 
-        print "Args... CTLid: %s neutralFrame %i\n" % (ctlId,neutralId)
+        print "Args... CTLid: %s neutralFrame %i\n" % (ctlId,self.NEUTRAL_TIME)
 
 
 
@@ -122,15 +132,21 @@ class Main(om.MPxCommand):
 
         CTL_TREE = self.createCTLgroupsList(dagIterator, ctlId)
 
-        allCurrentVals = self.getNodeWeightList(CTL_TREE)
+        allStartingWeights = self.getNodeWeightList(CTL_TREE)
 
-        print "allCurrentVals: %s" % allCurrentVals
+        print "allStartingWeights: %s" % allStartingWeights
 
-        guiTemp = GUI(CTL_TREE)
+        self.STARTING_TIME = cmds.currentTime(query=True)
+        print "NEUTRAL_FRAME: %i, STARTING_FRAME: %i" % (self.NEUTRAL_TIME, self.STARTING_TIME)
+        allNeutralWeights = self.getNodeWeightAtTime(CTL_TREE, self.NEUTRAL_TIME)
+
+        print "allNeutralWeights: %s" % allNeutralWeights
+
+        guiTemp = GUI(CTL_TREE,allStartingWeights,allNeutralWeights)
 
 
         # Skeleton working stub
-        print "Stub 3"
+        print "Stub 8"
 
         # # API 1.0
         # selectionList = om.MSelectionList()
@@ -229,6 +245,25 @@ class Main(om.MPxCommand):
                 nodeDict[node.translateName] = node.weight
 
             groupDict[key] = nodeDict
+
+        return groupDict
+
+    def getNodeWeightAtTime(self, CTL_tree, time):
+
+        if time:
+            cmds.currentTime(time)
+
+        groupDict = {}
+        for key,group in CTL_tree.iteritems():
+            nodeDict = {}
+            for node in group:
+                attrWeight = cmds.getAttr(node.translateName)
+                nodeDict[node.translateName] = attrWeight
+
+            groupDict[key] = nodeDict
+
+        if time:
+            cmds.currentTime(self.STARTING_TIME)
 
         return groupDict
 
