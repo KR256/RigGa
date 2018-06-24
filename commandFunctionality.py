@@ -115,7 +115,7 @@ class Main(om.MPxCommand):
     def doIt(self, args):
 
         # Skeleton working stub
-        print "Stub In 9"
+        print "Stub In 2"
 
         # We recommend parsing your arguments first.
         argVals = self.parseArguments(args)
@@ -142,11 +142,15 @@ class Main(om.MPxCommand):
 
         print "allNeutralWeights: %s" % allNeutralWeights
 
+        strongestShapes = self.getStrongestShapes(allStartingWeights, allNeutralWeights)
+
+        print strongestShapes
+
         guiTemp = GUI(CTL_TREE,allStartingWeights,allNeutralWeights)
 
 
         # Skeleton working stub
-        print "Stub 8"
+        print "Stub 1"
 
         # # API 1.0
         # selectionList = om.MSelectionList()
@@ -266,4 +270,16 @@ class Main(om.MPxCommand):
             cmds.currentTime(self.STARTING_TIME)
 
         return groupDict
+
+    def getStrongestShapes(self, currentTree, neutralTree):
+
+        sortedTree = {}
+        for key1, group1 in currentTree.iteritems():
+            neutralGroup = neutralTree[key1]
+            diffDict = {k: abs(group1[k] - neutralTree.get(k, 0)) for k in group1.keys()}
+            filteredDict = dict((k, v) for k, v in diffDict.iteritems() if v > 0.05)
+            sortedDict = sorted(filteredDict.items(), key=lambda x: x[1], reverse=True)
+            sortedTree[key1] = sortedDict
+
+        return sortedTree
 
