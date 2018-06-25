@@ -60,14 +60,17 @@ class CTLnode():
 
 class GUI():
 
-    def __init__(self, CTL_TREE,allStartingWeights,allNeutralWeights, allCurrentGenWeights, strongestShapes):
+    def __init__(self, CTL_TREE,allStartingWeights,allNeutralWeights, allCurrentGenWeights, strongestShapes, minMaxWeights):
 
         self.ctlTree = CTL_TREE
         self.allStartingWeights = allStartingWeights
         self.allCurrentGenWeights = allCurrentGenWeights
+        self.allCurrentWeights = allCurrentGenWeights
         self.allNeutralWeights = allNeutralWeights
+        self.allMinMaxWeights = minMaxWeights
         self.strongestShapes = strongestShapes
         self.generationSelection = []
+        self.nextGeneration = []
 
         winID = 'rigUI'
 
@@ -76,6 +79,11 @@ class GUI():
         cmds.window(winID, width = 100, height = 100)
 
         cmds.columnLayout("columnLayout")
+
+        controlGroup = cmds.optionMenu(label='Control Group')
+        cmds.menuItem(label='All')
+        for key in self.ctlTree:
+            cmds.menuItem(label=key)
 
         # Add controls into this Layout
         cmds.text(label="Mutate Rate Lower:")
@@ -86,68 +94,122 @@ class GUI():
                                       parent="columnLayout")
         cmds.text(label="Constrain to Active Shapes:")
         constrainFlag = cmds.checkBox(label='constrainFlag', align='right', editable=True)
-        cmds.button(label='Random Sample from Current', command=partial(self.randomMizeCTLs,numShapes,mRateUpper,constrainFlag))
-        cmds.button(label='Reset To Gen', command=partial(self.setCTLTreeTo, 'currentGen'))
-        cmds.button(label='Reset To Starting', command=partial(self.setCTLTreeTo, 'starting'))
-        cmds.button(label='Reset To Neutral', command=partial(self.setCTLTreeTo, 'neutral'))
+        cmds.text(label="Sample around Current Weight:")
+        sampleFlag = cmds.checkBox(label='sampleWeight', align='right', editable=True, value=True)
+        cmds.button(label='Random Sample from Current',
+                    command=partial(self.randomMizeCTLs,numShapes,mRateUpper,constrainFlag,sampleFlag, controlGroup))
+        cmds.button(label='Reset To Gen', command=partial(self.updateRig, 'currentGen'))
+        cmds.button(label='Reset To Starting', command=partial(self.updateRig, 'starting'))
+        cmds.button(label='Reset To Neutral', command=partial(self.updateRig, 'neutral'))
         cmds.button(label='Set Current as Next Gen', command=partial(self.setCurrentGen))
         cmds.button(label='Add to selection', command=partial(self.addCurrentToSelection))
         cmds.text(label="Elite from Selection:")
         eliteId = cmds.intField("eliteId", minValue=1, maxValue=10, value=1, editable=True,
                                 parent="columnLayout")
-        cmds.button(label='Spawn Next Gen from Selection', command=partial(self.spawnNextGen,eliteId) )
+        cmds.button(label='Spawn Next Gen from Selection',
+                    command=partial(self.spawnNextGen,eliteId,numShapes,mRateUpper,constrainFlag,sampleFlag,controlGroup) )
+        cmds.button(label='Next', command=partial(self.displayNext))
 
 
         # Display the window
         cmds.showWindow()
 
-    def randomMizeCTLs(self, numShapes, mRateUpper, cFlag, *args):
+    def randomMizeCTLs(self, numShapes, mRateUpper, cFlag, sFlag, cGroup, *args):
         print "Randomise"
 
         #print "Random func In: %s" % self.allCurrentGenWeights
-        self.setCTLTreeTo('currentGen')
+        self.updateRig('currentGen')
         #print "Random func In2: %s" % self.allCurrentGenWeights
 
         numSampleShapes = cmds.intField(numShapes, query=True, value=True)
         upperLim = cmds.floatField(mRateUpper, query=True, value=True)
         constrainFlag = cmds.checkBox(cFlag, query=True, value=True)
+        sampleFlag = cmds.checkBox(sFlag, query=True, value=True)
+        controlGroup = cmds.optionMenu(cGroup, query=True, value=True)
 
-        if constrainFlag:
-            for key, value in self.strongestShapes.iteritems():
-                if not value:
-                    continue
-                randKeys = random.sample(list(value), min(numSampleShapes,len(value)))
-                print randKeys
-                for sortedTupleKey in randKeys:
-                    currentNode = self.ctlTree[key][sortedTupleKey[0]]
-                    currentWeight = currentNode.getWeight()
-                    randWeight = random.gauss(currentWeight,upperLim)
-                    print currentNode
-                    self.ctlTree[key][sortedTupleKey[0]].setWeight(randWeight)
-                    print currentNode
+        print controlGroup
 
+        randomCTLTree = self.randomCTLweights(self.allCurrentGenWeights, numSampleShapes, upperLim, constrainFlag,sampleFlag, controlGroup)
+        self.allCurrentWeights = randomCTLTree
+        self.updateRig('current')
 
-        else:
-            for key, value in self.ctlTree.iteritems():
-                print "CTL GROUP: %s" % key
-                randKeys = random.sample(list(value),min(numSampleShapes,len(value)))
-                print randKeys
-                for ctlNode in randKeys:
-                    #print ctlNode
-                    currentNode = self.ctlTree[key][ctlNode]
-                    currentWeight = currentNode.getWeight()
-                    randWeight = random.gauss(currentWeight, upperLim)
-                    print currentNode
-                    self.ctlTree[key][ctlNode].setWeight(randWeight)
-                    print currentNode
+        # if constrainFlag:
+        #     for key, value in self.strongestShapes.iteritems():
+        #         if not value:
+        #             continue
+        #         randKeys = random.sample(list(value), min(numSampleShapes,len(value)))
+        #         print randKeys
+        #         for sortedTupleKey in randKeys:
+        #             currentNode = self.ctlTree[key][sortedTupleKey[0]]
+        #             currentWeight = currentNode.getWeight()
+        #             randWeight = random.gauss(currentWeight,upperLim)
+        #             print currentNode
+        #             self.ctlTree[key][sortedTupleKey[0]].setWeight(randWeight)
+        #             print currentNode
+        #
+        #
+        # else:
+        #     for key, value in self.ctlTree.iteritems():
+        #         print "CTL GROUP: %s" % key
+        #         randKeys = random.sample(list(value),min(numSampleShapes,len(value)))
+        #         print randKeys
+        #         for ctlNode in randKeys:
+        #             #print ctlNode
+        #             currentNode = self.ctlTree[key][ctlNode]
+        #             currentWeight = currentNode.getWeight()
+        #             randWeight = random.gauss(currentWeight, upperLim)
+        #             print currentNode
+        #             self.ctlTree[key][ctlNode].setWeight(randWeight)
+        #             print currentNode
 
         #print "Random func Out: %s" % self.allCurrentGenWeights
 
-    def setCTLTreeTo(self, weightTreeStr, *args):
+    def randomCTLweights(self,inputCTLtree, numSampleShapes, upperLim, constrainFlag, sampleFlag, controlGroup):
+
+        returnTree = copy.deepcopy(inputCTLtree)
+
+        if constrainFlag:
+            for key, value in self.strongestShapes.iteritems():
+                if controlGroup != 'All' and controlGroup != key:
+                    continue
+                if not value:
+                    continue
+                randKeys = random.sample(list(value), min(numSampleShapes,len(value)))
+                print "RandKeys: %s" % randKeys
+                for sortedTupleKey in randKeys:
+                    currentWeight = inputCTLtree[key][sortedTupleKey[0]]
+                    if sampleFlag:
+                        randWeight = random.gauss(currentWeight,upperLim)
+                    else:
+                        minMaxWeight = self.allMinMaxWeights[key][sortedTupleKey[0]]
+                        randWeight = random.uniform(minMaxWeight[0], minMaxWeight[1])
+                    returnTree[key][sortedTupleKey[0]] = randWeight
+
+
+        else:
+            for key, value in inputCTLtree.iteritems():
+                if controlGroup != 'All' and controlGroup != key:
+                    continue
+                randKeys = random.sample(list(value),min(numSampleShapes,len(value)))
+                print "RandKeys: %s" % randKeys
+                for ctlKey in randKeys:
+                    #print ctlNode
+                    currentWeight = inputCTLtree[key][ctlKey]
+                    if sampleFlag:
+                        randWeight = random.gauss(currentWeight, upperLim)
+                    else:
+                        minMaxWeight = self.allMinMaxWeights[key][ctlKey]
+                        randWeight = random.uniform(minMaxWeight[0], minMaxWeight[1])
+                    returnTree[key][ctlKey] = randWeight
+
+        return returnTree
+
+    def updateRig(self, weightTreeStr, *args):
 
         weightDict = {'currentGen':self.allCurrentGenWeights,
                       'starting':self.allStartingWeights,
-                      'neutral':self.allNeutralWeights}
+                      'neutral':self.allNeutralWeights,
+                      'current':self.allCurrentWeights}
         weightTree = weightDict[weightTreeStr]
         print "New weights: %s\n" % weightTree
 
@@ -184,12 +246,17 @@ class GUI():
         currentTree = self.getCurrentWeights()
         self.generationSelection.append(currentTree)
 
-    def spawnNextGen(self, eliteId, *args):
+    def spawnNextGen(self, eliteId,numShapes,mRateUpper, cFlag, cGroup, *args):
         print "Spawning next gen"
 
         eliteNum = cmds.intField(eliteId, query=True, value=True) - 1
+        numSampleShapes = cmds.intField(numShapes, query=True, value=True)
+        upperLim = cmds.floatField(mRateUpper, query=True, value=True)
+        constrainFlag = cmds.checkBox(cFlag, query=True, value=True)
+        controlGroup = cmds.optionMenu(cGroup, query=True, value=True)
 
         genSelection = self.generationSelection
+        nextGeneration = self.nextGeneration
         for child in genSelection:
             print child
 
@@ -198,20 +265,53 @@ class GUI():
             # Small mutations around Elite
             if i < 5:
                 eliteCTLtree = copy.deepcopy(genSelection[eliteNum])
-                #self.randomCTLweights()
+                randEliteTree = self.randomCTLweights(eliteCTLtree, numSampleShapes, upperLim, True, True,controlGroup)
+                nextGeneration.append(randEliteTree)
             # Breeding of Elite and Other Selected
             elif i < 10:
-                pass
+                eliteCTLtree = copy.deepcopy(genSelection[eliteNum])
+                secondTree = random.choice(genSelection)
+                bredTree = self.breedTrees(eliteCTLtree, secondTree, controlGroup)
+                nextGeneration.append(bredTree)
             # Breeding of Elite and Other Selected + Mutation
             elif i < 15:
-                pass
+                eliteCTLtree = copy.deepcopy(genSelection[eliteNum])
+                secondTree = random.choice(genSelection)
+                bredTree = self.breedTrees(eliteCTLtree, secondTree, controlGroup)
+                randEliteTree = self.randomCTLweights(bredTree, numSampleShapes, upperLim, True, False, controlGroup)
+                nextGeneration.append(randEliteTree)
             # Less constrained mutation
             else:
-                pass
+                eliteCTLtree = copy.deepcopy(genSelection[eliteNum])
+                randEliteTree = self.randomCTLweights(eliteCTLtree, 2, upperLim, False, False, controlGroup)
+                nextGeneration.append(randEliteTree)
             #Add elite face at end
 
         self.allCurrentGenWeights = eliteCTLtree
-        self.setCTLTreeTo('currentGen')
+        self.updateRig('currentGen')
+
+    def displayNext(self, *args):
+        nextGeneration = self.nextGeneration
+        currentNode = nextGeneration.pop(0)
+        self.allCurrentWeights = currentNode
+        self.updateRig('current')
+        self.nextGeneration = nextGeneration
+
+    def breedTrees(self, tree1, tree2, controlGroup):
+
+        returnTree = copy.deepcopy(tree1)
+        for keys,values in tree1.iteritems():
+            if controlGroup != 'All' and controlGroup != keys:
+                continue
+            for keys2,values2 in values.iteritems():
+
+                coinToss = random.random()
+
+                if coinToss < 0.5:
+                    returnTree[keys][keys2] = tree2[keys][keys2]
+
+        return returnTree
+
 
 
 
@@ -265,7 +365,9 @@ class Main(om.MPxCommand):
 
         print strongestShapes
 
-        guiTemp = GUI(CTL_TREE,allStartingWeights,allNeutralWeights,allCurrentGenWeights,strongestShapes)
+        minMaxWeights = self.getMinMaxWeight(CTL_TREE)
+
+        guiTemp = GUI(CTL_TREE,allStartingWeights,allNeutralWeights,allCurrentGenWeights,strongestShapes,minMaxWeights)
 
 
         # Skeleton working stub
@@ -336,6 +438,8 @@ class Main(om.MPxCommand):
             for cName in CTL_GROUP_OPTIONS:
                 if cName in dagPathStr:
                     selectedGroupShort = cName
+                else:
+                    selectedGroupShort = dagPathStr[dagPathStr.rfind('|')+1:]
             print "New group name:%s" % selectedGroupShort
 
             # Get all Controllers
@@ -366,6 +470,19 @@ class Main(om.MPxCommand):
             nodeDict = {}
             for key2, node in group.iteritems():
                 nodeDict[node.translateName] = node.weight
+
+            groupDict[key] = nodeDict
+
+        return groupDict
+
+    def getMinMaxWeight(self, CTL_tree):
+
+
+        groupDict = {}
+        for key,group in CTL_tree.iteritems():
+            nodeDict = {}
+            for key2, node in group.iteritems():
+                nodeDict[node.translateName] = node.weightMinMax
 
             groupDict[key] = nodeDict
 
