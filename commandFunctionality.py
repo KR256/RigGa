@@ -60,7 +60,8 @@ class CTLnode():
 
 class GUI():
 
-    def __init__(self, CTL_TREE,allStartingWeights,allNeutralWeights, allCurrentGenWeights, strongestShapes, minMaxWeights):
+    def __init__(self, CTL_TREE,allStartingWeights,allNeutralWeights,
+                 allCurrentGenWeights, strongestShapes, minMaxWeights, allSymmetryNames):
 
         self.ctlTree = CTL_TREE
         self.allStartingWeights = allStartingWeights
@@ -71,6 +72,7 @@ class GUI():
         self.strongestShapes = strongestShapes
         self.generationSelection = []
         self.nextGeneration = []
+        self.allSymmetryNames = allSymmetryNames
 
         winID = 'rigUI'
 
@@ -85,6 +87,9 @@ class GUI():
         for key in self.ctlTree:
             cmds.menuItem(label=key)
 
+        cmds.text(label="Symmetry On:")
+        symFlag = cmds.checkBox(label='symFlag', align='right', editable=True)
+
         # Add controls into this Layout
         cmds.text(label="Mutate Rate Lower:")
         numShapes = cmds.intField("numShapes", minValue=1, maxValue=10, value=3, editable=True,
@@ -97,7 +102,7 @@ class GUI():
         cmds.text(label="Sample around Current Weight:")
         sampleFlag = cmds.checkBox(label='sampleWeight', align='right', editable=True, value=True)
         cmds.button(label='Random Sample from Current',
-                    command=partial(self.randomMizeCTLs,numShapes,mRateUpper,constrainFlag,sampleFlag, controlGroup))
+                    command=partial(self.randomMizeCTLs,numShapes,mRateUpper,constrainFlag,sampleFlag, controlGroup, symFlag))
         cmds.button(label='Reset To Gen', command=partial(self.updateRig, 'currentGen'))
         cmds.button(label='Reset To Starting', command=partial(self.updateRig, 'starting'))
         cmds.button(label='Reset To Neutral', command=partial(self.updateRig, 'neutral'))
@@ -107,14 +112,14 @@ class GUI():
         eliteId = cmds.intField("eliteId", minValue=1, maxValue=10, value=1, editable=True,
                                 parent="columnLayout")
         cmds.button(label='Spawn Next Gen from Selection',
-                    command=partial(self.spawnNextGen,eliteId,numShapes,mRateUpper,constrainFlag,sampleFlag,controlGroup) )
+                    command=partial(self.spawnNextGen,eliteId,numShapes,mRateUpper,constrainFlag,sampleFlag,controlGroup, symFlag) )
         cmds.button(label='Next', command=partial(self.displayNext))
 
 
         # Display the window
         cmds.showWindow()
 
-    def randomMizeCTLs(self, numShapes, mRateUpper, cFlag, sFlag, cGroup, *args):
+    def randomMizeCTLs(self, numShapes, mRateUpper, cFlag, sFlag, cGroup, syFlag, *args):
         print "Randomise"
 
         #print "Random func In: %s" % self.allCurrentGenWeights
@@ -126,10 +131,13 @@ class GUI():
         constrainFlag = cmds.checkBox(cFlag, query=True, value=True)
         sampleFlag = cmds.checkBox(sFlag, query=True, value=True)
         controlGroup = cmds.optionMenu(cGroup, query=True, value=True)
+        symFlag = cmds.checkBox(syFlag, query=True, value=True)
 
         print controlGroup
 
-        randomCTLTree = self.randomCTLweights(self.allCurrentGenWeights, numSampleShapes, upperLim, constrainFlag,sampleFlag, controlGroup)
+        randomCTLTree = self.randomCTLweights(self.allCurrentGenWeights,
+                                              numSampleShapes, upperLim, constrainFlag,
+                                              sampleFlag, controlGroup, symFlag)
         self.allCurrentWeights = randomCTLTree
         self.updateRig('current')
 
@@ -164,7 +172,7 @@ class GUI():
 
         #print "Random func Out: %s" % self.allCurrentGenWeights
 
-    def randomCTLweights(self,inputCTLtree, numSampleShapes, upperLim, constrainFlag, sampleFlag, controlGroup):
+    def randomCTLweights(self,inputCTLtree, numSampleShapes, upperLim, constrainFlag, sampleFlag, controlGroup, symFlag):
 
         returnTree = copy.deepcopy(inputCTLtree)
 
@@ -185,6 +193,10 @@ class GUI():
                         randWeight = random.uniform(minMaxWeight[0], minMaxWeight[1])
                     returnTree[key][sortedTupleKey[0]] = randWeight
 
+                    if symFlag:
+                        opposite = self.allSymmetryNames[key][sortedTupleKey[0]]
+                        returnTree[key][opposite] = randWeight
+
 
         else:
             for key, value in inputCTLtree.iteritems():
@@ -201,6 +213,10 @@ class GUI():
                         minMaxWeight = self.allMinMaxWeights[key][ctlKey]
                         randWeight = random.uniform(minMaxWeight[0], minMaxWeight[1])
                     returnTree[key][ctlKey] = randWeight
+
+                    if symFlag:
+                        opposite = self.allSymmetryNames[key][ctlKey]
+                        returnTree[key][opposite] = randWeight
 
         return returnTree
 
@@ -367,7 +383,12 @@ class Main(om.MPxCommand):
 
         minMaxWeights = self.getMinMaxWeight(CTL_TREE)
 
-        guiTemp = GUI(CTL_TREE,allStartingWeights,allNeutralWeights,allCurrentGenWeights,strongestShapes,minMaxWeights)
+        allSymmetryNames = self.getSymmetryNames(CTL_TREE)
+
+        print allSymmetryNames
+
+        guiTemp = GUI(CTL_TREE,allStartingWeights,allNeutralWeights,allCurrentGenWeights,
+                      strongestShapes,minMaxWeights,allSymmetryNames)
 
 
         # Skeleton working stub
@@ -518,4 +539,40 @@ class Main(om.MPxCommand):
             sortedTree[key1] = sortedDict
 
         return sortedTree
+
+    def getSymmetryNames(self, CTL_tree):
+
+        leftRightDict = {'_L_': '_R_', '_l_': '_r_', 'left':'right','Left':'Right', 'l_':'r_' }
+
+        groupDict = {}
+        for key,group in CTL_tree.iteritems():
+            nodeDict = {}
+            for key2, node in group.iteritems():
+                for keys,values in leftRightDict.iteritems():
+                    key_temp = copy.copy(key2)
+                    if keys in key2 or key2.startswith('l_'):
+                        print "YEah Left"
+                        replaceKey = key_temp.replace(keys,values,1)
+                        print replaceKey
+                        nodeDict[key_temp] = replaceKey
+                        breakFlag = True
+                    elif values in key2 or key2.startswith('r_'):
+                        print "yeah right"
+                        replaceKey = key_temp.replace(values,keys,1)
+                        print replaceKey
+                        nodeDict[key_temp] = replaceKey
+                        breakFlag = True
+
+                    if breakFlag:
+                        break
+
+                if key2 not in nodeDict:
+                    nodeDict[key2] = key2
+
+                    # else:
+                    #     nodeDict[key2] = key2
+
+            groupDict[key] = nodeDict
+
+        return groupDict
 
