@@ -2,6 +2,7 @@ import sys
 import maya.api.OpenMaya as om
 import maya.cmds as cmds
 import random
+import copy
 from functools import partial
 
 class CTLnode():
@@ -45,6 +46,12 @@ class CTLnode():
 
         return translateCTLs
 
+    def getWeight(self):
+
+        weight = cmds.getAttr(self.translateName)
+
+        return weight
+
     def setWeight(self, newWeight):
 
         cmds.setAttr(self.translateName, newWeight)
@@ -53,10 +60,11 @@ class CTLnode():
 
 class GUI():
 
-    def __init__(self, CTL_TREE,allStartingWeights,allNeutralWeights,strongestShapes):
+    def __init__(self, CTL_TREE,allStartingWeights,allNeutralWeights, allCurrentGenWeights, strongestShapes):
 
         self.ctlTree = CTL_TREE
         self.allStartingWeights = allStartingWeights
+        self.allCurrentGenWeights = allCurrentGenWeights
         self.allNeutralWeights = allNeutralWeights
         self.strongestShapes = strongestShapes
 
@@ -78,8 +86,10 @@ class GUI():
         cmds.text(label="Constrain to Active Shapes:")
         constrainFlag = cmds.checkBox(label='constrainFlag', align='right', editable=True)
         cmds.button(label='Random', command=partial(self.randomMizeCTLs,numShapes,mRateUpper,constrainFlag))
-        cmds.button(label='Reset To Starting', command=partial(self.setCTLTreeTo, allStartingWeights))
-        cmds.button(label='Reset To Neutral', command=partial(self.setCTLTreeTo, allNeutralWeights))
+        cmds.button(label='Reset To Gen', command=partial(self.setCTLTreeTo, 'currentGen'))
+        cmds.button(label='Reset To Starting', command=partial(self.setCTLTreeTo, 'starting'))
+        cmds.button(label='Reset To Neutral', command=partial(self.setCTLTreeTo, 'neutral'))
+        cmds.button(label='Set Current as Next Gen', command=partial(self.setCurrentGen))
 
         # Display the window
         cmds.showWindow()
@@ -87,7 +97,9 @@ class GUI():
     def randomMizeCTLs(self, numShapes, mRateUpper, cFlag, *args):
         print "Randomise"
 
-        self.setCTLTreeTo(self.allStartingWeights)
+        #print "Random func In: %s" % self.allCurrentGenWeights
+        self.setCTLTreeTo('currentGen')
+        #print "Random func In2: %s" % self.allCurrentGenWeights
 
         numSampleShapes = cmds.intField(numShapes, query=True, value=True)
         upperLim = cmds.floatField(mRateUpper, query=True, value=True)
@@ -101,7 +113,7 @@ class GUI():
                 print randKeys
                 for sortedTupleKey in randKeys:
                     currentNode = self.ctlTree[key][sortedTupleKey[0]]
-                    currentWeight = currentNode.weight
+                    currentWeight = currentNode.getWeight()
                     randWeight = random.gauss(currentWeight,upperLim)
                     print currentNode
                     self.ctlTree[key][sortedTupleKey[0]].setWeight(randWeight)
@@ -116,17 +128,54 @@ class GUI():
                 for ctlNode in randKeys:
                     #print ctlNode
                     currentNode = self.ctlTree[key][ctlNode]
-                    currentWeight = currentNode.weight
+                    currentWeight = currentNode.getWeight()
                     randWeight = random.gauss(currentWeight, upperLim)
                     print currentNode
                     self.ctlTree[key][ctlNode].setWeight(randWeight)
                     print currentNode
 
-    def setCTLTreeTo(self, weightTree, *args):
+        #print "Random func Out: %s" % self.allCurrentGenWeights
+
+    def setCTLTreeTo(self, weightTreeStr, *args):
+
+        weightDict = {'currentGen':self.allCurrentGenWeights,
+                      'starting':self.allStartingWeights,
+                      'neutral':self.allNeutralWeights}
+        weightTree = weightDict[weightTreeStr]
+        print args
+        print "New weights: %s\n" % weightTree
+        print self.allStartingWeights
+        print self.allCurrentGenWeights
+
         for groupKey, groupNode in self.ctlTree.iteritems():
             for nodeKey,ctlNode in groupNode.iteritems():
                 newWeight = weightTree[groupKey][ctlNode.translateName]
                 ctlNode.setWeight(newWeight)
+
+
+
+    def getCurrentWeights(self):
+
+        CTL_tree = self.ctlTree
+        groupDict = {}
+        for key,group in CTL_tree.iteritems():
+            nodeDict = {}
+            for key2, node in group.iteritems():
+                nodeDict[node.translateName] = node.getWeight()
+
+            groupDict[key] = nodeDict
+
+        return groupDict
+
+    def setCurrentGen(self, *args):
+
+        currentTree = self.getCurrentWeights()
+        # print "All current gen weights: %s" % self.allCurrentGenWeights
+        # print "currentTree: %s" % currentTree
+        self.allCurrentGenWeights = currentTree
+        print "New all current gen weights: %s" % self.allCurrentGenWeights
+        print "New all starting weights: %s" % self.allStartingWeights
+
 
 
 ##########################################################
@@ -143,7 +192,7 @@ class Main(om.MPxCommand):
     def doIt(self, args):
 
         # Skeleton working stub
-        print "Stub In 5"
+        print "Stub In 3"
 
         # We recommend parsing your arguments first.
         argVals = self.parseArguments(args)
@@ -161,6 +210,7 @@ class Main(om.MPxCommand):
         CTL_TREE = self.createCTLgroupsList(dagIterator, ctlId)
 
         allStartingWeights = self.getNodeWeightList(CTL_TREE)
+        allCurrentGenWeights = self.getNodeWeightList(CTL_TREE)
 
         print "allStartingWeights: %s" % allStartingWeights
 
@@ -170,11 +220,13 @@ class Main(om.MPxCommand):
 
         print "allNeutralWeights: %s" % allNeutralWeights
 
+
+
         strongestShapes = self.getStrongestShapes(allStartingWeights, allNeutralWeights)
 
         print strongestShapes
 
-        guiTemp = GUI(CTL_TREE,allStartingWeights,allNeutralWeights,strongestShapes)
+        guiTemp = GUI(CTL_TREE,allStartingWeights,allNeutralWeights,allCurrentGenWeights,strongestShapes)
 
 
         # Skeleton working stub
@@ -266,7 +318,6 @@ class Main(om.MPxCommand):
             pSelectionListIterator.next()
 
         return CTL_TREE
-
 
     def getNodeWeightList(self, CTL_tree):
 
