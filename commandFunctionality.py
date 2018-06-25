@@ -67,6 +67,7 @@ class GUI():
         self.allCurrentGenWeights = allCurrentGenWeights
         self.allNeutralWeights = allNeutralWeights
         self.strongestShapes = strongestShapes
+        self.generationSelection = []
 
         winID = 'rigUI'
 
@@ -85,11 +86,17 @@ class GUI():
                                       parent="columnLayout")
         cmds.text(label="Constrain to Active Shapes:")
         constrainFlag = cmds.checkBox(label='constrainFlag', align='right', editable=True)
-        cmds.button(label='Random', command=partial(self.randomMizeCTLs,numShapes,mRateUpper,constrainFlag))
+        cmds.button(label='Random Sample from Current', command=partial(self.randomMizeCTLs,numShapes,mRateUpper,constrainFlag))
         cmds.button(label='Reset To Gen', command=partial(self.setCTLTreeTo, 'currentGen'))
         cmds.button(label='Reset To Starting', command=partial(self.setCTLTreeTo, 'starting'))
         cmds.button(label='Reset To Neutral', command=partial(self.setCTLTreeTo, 'neutral'))
         cmds.button(label='Set Current as Next Gen', command=partial(self.setCurrentGen))
+        cmds.button(label='Add to selection', command=partial(self.addCurrentToSelection))
+        cmds.text(label="Elite from Selection:")
+        eliteId = cmds.intField("eliteId", minValue=1, maxValue=10, value=1, editable=True,
+                                parent="columnLayout")
+        cmds.button(label='Spawn Next Gen from Selection', command=partial(self.spawnNextGen,eliteId) )
+
 
         # Display the window
         cmds.showWindow()
@@ -142,10 +149,7 @@ class GUI():
                       'starting':self.allStartingWeights,
                       'neutral':self.allNeutralWeights}
         weightTree = weightDict[weightTreeStr]
-        print args
         print "New weights: %s\n" % weightTree
-        print self.allStartingWeights
-        print self.allCurrentGenWeights
 
         for groupKey, groupNode in self.ctlTree.iteritems():
             for nodeKey,ctlNode in groupNode.iteritems():
@@ -176,6 +180,41 @@ class GUI():
         print "New all current gen weights: %s" % self.allCurrentGenWeights
         print "New all starting weights: %s" % self.allStartingWeights
 
+    def addCurrentToSelection(self, *args):
+        currentTree = self.getCurrentWeights()
+        self.generationSelection.append(currentTree)
+
+    def spawnNextGen(self, eliteId, *args):
+        print "Spawning next gen"
+
+        eliteNum = cmds.intField(eliteId, query=True, value=True) - 1
+
+        genSelection = self.generationSelection
+        for child in genSelection:
+            print child
+
+        for i in range(20):
+
+            # Small mutations around Elite
+            if i < 5:
+                eliteCTLtree = copy.deepcopy(genSelection[eliteNum])
+                #self.randomCTLweights()
+            # Breeding of Elite and Other Selected
+            elif i < 10:
+                pass
+            # Breeding of Elite and Other Selected + Mutation
+            elif i < 15:
+                pass
+            # Less constrained mutation
+            else:
+                pass
+            #Add elite face at end
+
+        self.allCurrentGenWeights = eliteCTLtree
+        self.setCTLTreeTo('currentGen')
+
+
+
 
 
 ##########################################################
@@ -192,7 +231,7 @@ class Main(om.MPxCommand):
     def doIt(self, args):
 
         # Skeleton working stub
-        print "Stub In 3"
+        print "Stub In 4"
 
         # We recommend parsing your arguments first.
         argVals = self.parseArguments(args)
