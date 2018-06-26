@@ -550,6 +550,7 @@ class Main(om.MPxCommand):
             for key2, node in group.iteritems():
                 for keys,values in leftRightDict.iteritems():
                     key_temp = copy.copy(key2)
+                    breakFlag = False
                     if keys in key2 or key2.startswith('l_'):
                         print "YEah Left"
                         replaceKey = key_temp.replace(keys,values,1)
