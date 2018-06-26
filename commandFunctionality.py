@@ -73,6 +73,8 @@ class GUI():
         self.generationSelection = []
         self.nextGeneration = []
         self.allSymmetryNames = allSymmetryNames
+        self.buttonList = []
+
 
         winID = 'rigUI'
 
@@ -262,6 +264,47 @@ class GUI():
         currentTree = self.getCurrentWeights()
         self.generationSelection.append(currentTree)
 
+        IMG_PATH = 'C:/Users/cs/Documents/maya/projects/rigGAShri/images/tmp/'
+
+        SELECTION_SIZE = len(self.generationSelection)
+        currentRenderFile = "GASelectionGen%i" % SELECTION_SIZE
+        cmds.setAttr("defaultRenderGlobals.imageFilePrefix", currentRenderFile, type="string")
+        cmds.render('renderCam')
+        print "Rendering %s\n" % currentRenderFile
+
+        selectionUI = 'selectionUI'
+
+        if cmds.window(selectionUI, exists=True):
+            cmds.deleteUI(selectionUI)
+
+        cmds.window(selectionUI, width=300, height=100)
+
+        cmds.gridLayout(numberOfColumns=6,cellWidthHeight=(256, 256) )
+
+        buttonList = []
+        for face in range(SELECTION_SIZE):
+            currentImg = IMG_PATH + "GASelectionGen" + str(face+1) + ".jpeg"
+            print currentImg
+            buttonName = 'button%i' % face
+            buttonList.append(buttonName)
+            print buttonList
+            cmds.symbolCheckBox(buttonName,image=currentImg)
+        cmds.showWindow(selectionUI)
+
+        self.buttonList = buttonList
+
+    # def pressSelections(self, buttonName,*args):
+    #
+    #     if self.selectionIt == 0:
+    #         print "Elite"
+    #         # cmds.symbolButton(buttonName, edit=True, bgc = (0.0,1.0,0.0))
+    #
+    #     else:
+    #         print "Other"
+    #         # cmds.symbolButton(buttonName, edit=True, bgc=(0.0, 0.0, 1.0))
+    #
+    #     self.selectionIt += 1
+
     def spawnNextGen(self, eliteId,numShapes,mRateUpper, cFlag, cGroup, *args):
         print "Spawning next gen"
 
@@ -273,6 +316,8 @@ class GUI():
 
         genSelection = self.generationSelection
         nextGeneration = self.nextGeneration
+        
+
         for child in genSelection:
             print child
 
@@ -305,6 +350,8 @@ class GUI():
 
         self.allCurrentGenWeights = eliteCTLtree
         self.updateRig('currentGen')
+
+        self.selectionIt = 0
 
     def displayNext(self, *args):
         nextGeneration = self.nextGeneration
