@@ -73,6 +73,8 @@ class GUI():
         self.generationSelection = []
         self.nextGeneration = []
         self.allSymmetryNames = allSymmetryNames
+        self.buttonList = []
+
 
         winID = 'rigUI'
 
@@ -82,13 +84,13 @@ class GUI():
 
         cmds.columnLayout("columnLayout")
 
-        controlGroup = cmds.optionMenu(label='Control Group')
+        controlGroup = cmds.optionMenu("controlGroup",label='Control Group')
         cmds.menuItem(label='All')
         for key in self.ctlTree:
             cmds.menuItem(label=key)
 
         cmds.text(label="Symmetry On:")
-        symFlag = cmds.checkBox(label='symFlag', align='right', editable=True)
+        symFlag = cmds.checkBox("symFlag",label='symFlag', align='right', editable=True)
 
         # Add controls into this Layout
         cmds.text(label="Mutate Rate Lower:")
@@ -262,17 +264,81 @@ class GUI():
         currentTree = self.getCurrentWeights()
         self.generationSelection.append(currentTree)
 
+        IMG_PATH = 'C:/Users/cs/Documents/maya/projects/rigGAShri/images/tmp/'
+
+        SELECTION_SIZE = len(self.generationSelection)
+        currentRenderFile = "GASelectionGen%i" % SELECTION_SIZE
+        cmds.setAttr("defaultRenderGlobals.imageFilePrefix", currentRenderFile, type="string")
+        cmds.render('renderCam')
+        print "Rendering %s\n" % currentRenderFile
+
+        selectionUI = 'selectionUI'
+
+        if cmds.window(selectionUI, exists=True):
+            cmds.deleteUI(selectionUI)
+
+        cmds.window(selectionUI, width=300, height=100)
+
+        cmds.columnLayout("allLayout", adjustableColumn=True)
+        cmds.columnLayout("topLayout",parent = "allLayout")
+        cmds.button('selectAll', label = 'Select All', command=partial(self.changeAllSelection, True),parent="topLayout")
+        cmds.button('clearAll', label = 'Clear All', command=partial(self.changeAllSelection, False),parent="topLayout")
+
+        cmds.separator(parent="allLayout")
+
+        cmds.gridLayout("gridLayout",numberOfColumns=6,cellWidthHeight=(256, 256), parent = "allLayout" )
+
+        buttonList = []
+        for face in range(SELECTION_SIZE):
+            currentImg = IMG_PATH + "GASelectionGen" + str(face+1) + ".jpeg"
+            print currentImg
+            buttonName = 'button%i' % face
+            buttonList.append(buttonName)
+            print buttonList
+            cmds.symbolCheckBox(buttonName,image=currentImg,parent = "gridLayout")
+        cmds.showWindow(selectionUI)
+
+        self.buttonList = buttonList
+
+    # def pressSelections(self, buttonName,*args):
+    #
+    #     if self.selectionIt == 0:
+    #         print "Elite"
+    #         # cmds.symbolButton(buttonName, edit=True, bgc = (0.0,1.0,0.0))
+    #
+    #     else:
+    #         print "Other"
+    #         # cmds.symbolButton(buttonName, edit=True, bgc=(0.0, 0.0, 1.0))
+    #
+    #     self.selectionIt += 1
+
+    def changeAllSelection(self,flag,*args):
+
+        checkBoxNames = self.buttonList
+        for cB in checkBoxNames:
+            cmds.symbolCheckBox(cB, edit=True, value=flag)
+
+
     def spawnNextGen(self, eliteId,numShapes,mRateUpper, cFlag, cGroup, *args):
         print "Spawning next gen"
+
+        cmds.showWindow('rigUI')
 
         eliteNum = cmds.intField(eliteId, query=True, value=True) - 1
         numSampleShapes = cmds.intField(numShapes, query=True, value=True)
         upperLim = cmds.floatField(mRateUpper, query=True, value=True)
         constrainFlag = cmds.checkBox(cFlag, query=True, value=True)
-        controlGroup = cmds.optionMenu(cGroup, query=True, value=True)
+        controlGroup = cmds.optionMenu("controlGroup", query=True, value=True)
+        symFlag = cmds.checkBox("symFlag", query=True, value=True)
 
-        genSelection = self.generationSelection
+        genSelectionAll = self.generationSelection
         nextGeneration = self.nextGeneration
+        print genSelectionAll
+        selectedIds = self.getSelectedFromWindow()
+        print "SelectedIds: %s" % selectedIds
+        genSelection = [x for i,x in enumerate(genSelectionAll) if i in selectedIds]
+        # print genSelection
+
         for child in genSelection:
             print child
 
@@ -280,31 +346,43 @@ class GUI():
 
             # Small mutations around Elite
             if i < 5:
-                eliteCTLtree = copy.deepcopy(genSelection[eliteNum])
-                randEliteTree = self.randomCTLweights(eliteCTLtree, numSampleShapes, upperLim, True, True,controlGroup)
+                eliteCTLtree = copy.deepcopy(genSelectionAll[eliteNum])
+                randEliteTree = self.randomCTLweights(eliteCTLtree, numSampleShapes, upperLim, True, True,controlGroup,symFlag)
                 nextGeneration.append(randEliteTree)
             # Breeding of Elite and Other Selected
             elif i < 10:
-                eliteCTLtree = copy.deepcopy(genSelection[eliteNum])
+                eliteCTLtree = copy.deepcopy(genSelectionAll[eliteNum])
                 secondTree = random.choice(genSelection)
                 bredTree = self.breedTrees(eliteCTLtree, secondTree, controlGroup)
                 nextGeneration.append(bredTree)
             # Breeding of Elite and Other Selected + Mutation
             elif i < 15:
-                eliteCTLtree = copy.deepcopy(genSelection[eliteNum])
+                eliteCTLtree = copy.deepcopy(genSelectionAll[eliteNum])
                 secondTree = random.choice(genSelection)
                 bredTree = self.breedTrees(eliteCTLtree, secondTree, controlGroup)
-                randEliteTree = self.randomCTLweights(bredTree, numSampleShapes, upperLim, True, False, controlGroup)
+                randEliteTree = self.randomCTLweights(bredTree, numSampleShapes, upperLim, True, False, controlGroup,symFlag)
                 nextGeneration.append(randEliteTree)
             # Less constrained mutation
             else:
-                eliteCTLtree = copy.deepcopy(genSelection[eliteNum])
-                randEliteTree = self.randomCTLweights(eliteCTLtree, 2, upperLim, False, False, controlGroup)
+                eliteCTLtree = copy.deepcopy(genSelectionAll[eliteNum])
+                randEliteTree = self.randomCTLweights(eliteCTLtree, 2, upperLim, False, False, controlGroup,symFlag)
                 nextGeneration.append(randEliteTree)
             #Add elite face at end
 
         self.allCurrentGenWeights = eliteCTLtree
         self.updateRig('currentGen')
+
+
+    def getSelectedFromWindow(self):
+
+        checkBoxNames = self.buttonList
+        returnList = []
+        for i,cB in enumerate(checkBoxNames):
+            flag = cmds.symbolCheckBox(cB, query=True, value=True)
+            if flag:
+                returnList.append(i)
+
+        return returnList
 
     def displayNext(self, *args):
         nextGeneration = self.nextGeneration
@@ -347,7 +425,7 @@ class Main(om.MPxCommand):
     def doIt(self, args):
 
         # Skeleton working stub
-        print "Stub In 4"
+        print "Stub In 1"
 
         # We recommend parsing your arguments first.
         argVals = self.parseArguments(args)
@@ -552,15 +630,15 @@ class Main(om.MPxCommand):
                     key_temp = copy.copy(key2)
                     breakFlag = False
                     if keys in key2 or key2.startswith('l_'):
-                        print "YEah Left"
+                        # print "YEah Left"
                         replaceKey = key_temp.replace(keys,values,1)
-                        print replaceKey
+                        # print replaceKey
                         nodeDict[key_temp] = replaceKey
                         breakFlag = True
                     elif values in key2 or key2.startswith('r_'):
-                        print "yeah right"
+                        # print "yeah right"
                         replaceKey = key_temp.replace(values,keys,1)
-                        print replaceKey
+                        # print replaceKey
                         nodeDict[key_temp] = replaceKey
                         breakFlag = True
 
