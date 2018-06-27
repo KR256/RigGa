@@ -116,6 +116,7 @@ class GUI():
         cmds.button(label='Spawn Next Gen from Selection',
                     command=partial(self.spawnNextGen,eliteId,numShapes,mRateUpper,constrainFlag,sampleFlag,controlGroup, symFlag) )
         cmds.button(label='Next', command=partial(self.displayNext))
+        cmds.button(label='Set Keyframe', command=partial(self.setKeyframes))
 
 
         # Display the window
@@ -415,6 +416,13 @@ class GUI():
                     returnTree[keys][keys2] = tree2[keys][keys2]
 
         return returnTree
+
+    def setKeyframes(self, *args):
+        currentTree = self.allCurrentWeights
+        for key,vals in currentTree.iteritems():
+            for key2 in vals:
+                cmds.setKeyframe(key2)
+
 
 
 
