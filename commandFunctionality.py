@@ -214,11 +214,21 @@ class GUI():
                     else:
                         minMaxWeight = self.allMinMaxWeights[key][ctlKey]
                         randWeight = random.uniform(minMaxWeight[0], minMaxWeight[1])
-                    returnTree[key][ctlKey] = randWeight
+
 
                     if symFlag:
                         opposite = self.allSymmetryNames[key][ctlKey]
-                        returnTree[key][opposite] = randWeight
+                        if (opposite == ctlKey) and (ctlKey[-1] == 'X'):
+                            print "Key: %s, Opposite: %s" % (ctlKey,opposite)
+                            continue
+                        if ctlKey[-1] == 'Y':
+                            returnTree[key][opposite] = randWeight
+                        elif ctlKey[-1] == 'X':
+                            returnTree[key][opposite] = randWeight * -1
+                        else:
+                            print "Error with symmetry"
+
+                    returnTree[key][ctlKey] = randWeight
 
         return returnTree
 
