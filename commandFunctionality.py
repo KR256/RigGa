@@ -74,6 +74,9 @@ class GUI():
         self.nextGeneration = []
         self.allSymmetryNames = allSymmetryNames
         self.buttonList = []
+        self.newShapes = {}
+        self.startingCurves = {}
+        self.currentGenCurves = {}
 
 
         winID = 'rigUI'
@@ -93,7 +96,7 @@ class GUI():
         symFlag = cmds.checkBox("symFlag",label='symFlag', align='right', editable=True)
 
         # Add controls into this Layout
-        cmds.text(label="Mutate Rate Lower:")
+        cmds.text(label="Number of Shapes to mutate:")
         numShapes = cmds.intField("numShapes", minValue=1, maxValue=10, value=3, editable=True,
                                       parent="columnLayout")
         cmds.text(label="Mutate Rate Upper:")
@@ -117,7 +120,13 @@ class GUI():
                     command=partial(self.spawnNextGen,eliteId,numShapes,mRateUpper,constrainFlag,sampleFlag,controlGroup, symFlag) )
         cmds.button(label='Next', command=partial(self.displayNext))
         cmds.button(label='Set Keyframe', command=partial(self.setKeyframes))
-
+        minTime = cmds.playbackOptions( minTime=True, query=True)
+        maxTime = cmds.playbackOptions( maxTime=True, query=True)
+        startTime = cmds.intField("startTime", minValue=1, value=minTime, editable=True,
+                                  parent="columnLayout")
+        endTime = cmds.intField("endTime",  value=maxTime, editable=True,
+                                  parent="columnLayout")
+        cmds.button(label='Next Curve sample', command=partial(self.sampleNewCurvesFromOld))
 
         # Display the window
         cmds.showWindow()
@@ -246,6 +255,8 @@ class GUI():
             for nodeKey,ctlNode in groupNode.iteritems():
                 newWeight = weightTree[groupKey][ctlNode.translateName]
                 ctlNode.setWeight(newWeight)
+
+        self.allCurrentWeights = self.getCurrentWeights()
 
 
 
@@ -418,13 +429,96 @@ class GUI():
         return returnTree
 
     def setKeyframes(self, *args):
-        currentTree = self.allCurrentWeights
-        for key,vals in currentTree.iteritems():
-            for key2 in vals:
-                cmds.setKeyframe(key2)
+        currentTree = self.getCurrentWeights()
+        startingTree = self.allStartingWeights
 
+        minTime = cmds.intField("startTime", query=True, value=True)
+        maxTime = cmds.intField("endTime", query=True, value=True)
 
+        # startingCurves = self.getCurrentCurves()
+        # self.startingCurves = startingCurves
+        # print self.startingCurves
 
+        newShapesDict = {}
+        for key1,vals1 in currentTree.iteritems():
+            startingGroup = startingTree[key1]
+            diffDict = {k: vals1[k] - startingGroup.get(k, 0) for k in vals1.keys()}
+            print currentTree
+            print startingTree
+            print diffDict
+            print minTime
+            print maxTime
+
+            newShapes = {}
+            for key2 in vals1:
+                print "Cutting curve: %s offset %f" % (key2,diffDict[key2])
+                if diffDict[key2] > 0.3:
+                    newShapes[key2] = diffDict[key2]
+                cmds.keyframe(key2, edit=True, relative=True, time=(minTime, maxTime), valueChange=diffDict[key2], option="move")
+                #cmds.cutKey(key2, time=(minTime, maxTime), option="keys") # or keys?
+                #cmds.pasteKey(key2, time=(minTime, maxTime), valueOffset = diffDict[key2], option="replace")
+                print "PASTED"
+                # cmds.setKeyframe(key2)
+            sortedDict = sorted(newShapes.items(), key=lambda x: x[1], reverse=True)
+            newShapesDict[key1] = sortedDict
+
+        self.newShapes = newShapesDict
+        print self.newShapes
+
+        #self.currentGenCurves = self.getCurrentCurves()
+
+    def getCurve(self, curveName):
+
+        minTime = cmds.intField("startTime", query=True, value=True)
+        maxTime = cmds.intField("endTime", query=True, value=True)
+
+        curveTimes = cmds.keyframe(curveName, time=(minTime, maxTime), query=True, timeChange=True)
+        curveVals = cmds.keyframe(curveName, time=(minTime, maxTime), query=True, valueChange=True)
+
+        return (curveTimes,curveVals)
+
+    def getCurrentCurves(self):
+
+        tree = self.getCurrentWeights()
+
+        curveDict = {}
+        for key1,vals1 in tree.iteritems():
+            tempDict ={}
+            for key2 in vals1:
+                curveKeys = self.getCurve(key2)
+                tempDict[key2] = curveKeys
+            curveDict[key1] = tempDict
+        return curveDict
+
+    def sampleNewCurvesFromOld(self, *args):
+
+        minTime = cmds.intField("startTime", query=True, value=True)
+        maxTime = cmds.intField("endTime", query=True, value=True)
+
+        strongestShapes = self.strongestShapes
+
+        largest = 0
+        for key1,vals1 in strongestShapes.iteritems():
+            if vals1 == []:
+                continue
+            firstOfEach = vals1[0][1]
+            if firstOfEach > largest:
+                largest = firstOfEach
+                strongest = vals1[0][0]
+                endKey = key1
+
+        print "Strongest: %s with %d\n" % (strongest, firstOfEach)
+
+        self.strongestShapes = strongestShapes[endKey].pop(0)
+
+        print self.strongestShapes
+
+        for group,vals in self.newShapes.iteritems():
+
+            for shape in vals:
+                cmds.copyKey(strongest, time=(minTime, maxTime), option="keys")  # or keys?
+                cmds.pasteKey(shape[0], time=(minTime, maxTime), valueOffset=shape[1], option="replace")
+                #cmds.pasteKey(shape[0], time=(minTime, maxTime), option="replace")
 
 
 
@@ -630,7 +724,7 @@ class Main(om.MPxCommand):
         for key1, group1 in currentTree.iteritems():
             neutralGroup = neutralTree[key1]
             diffDict = {k: abs(group1[k] - neutralTree.get(k, 0)) for k in group1.keys()}
-            filteredDict = dict((k, v) for k, v in diffDict.iteritems() if v > 0.05)
+            filteredDict = dict((k, v) for k, v in diffDict.iteritems() if v > 0.1 or v < -0.1)
             sortedDict = sorted(filteredDict.items(), key=lambda x: x[1], reverse=True)
             sortedTree[key1] = sortedDict
 
