@@ -61,7 +61,7 @@ class CTLnode():
 class GUI():
 
     def __init__(self, CTL_TREE,allStartingWeights,allNeutralWeights,
-                 allCurrentGenWeights, strongestShapes, minMaxWeights, allSymmetryNames):
+                 allCurrentGenWeights, strongestShapes, minMaxWeights, allSymmetryNames,OTHER_FACE_IDS):
 
         self.ctlTree = CTL_TREE
         self.allStartingWeights = allStartingWeights
@@ -77,6 +77,7 @@ class GUI():
         self.newShapes = {}
         self.startingCurves = {}
         self.currentGenCurves = {}
+        self.OTHER_FACE_IDS = OTHER_FACE_IDS
 
 
         winID = 'rigUI'
@@ -449,12 +450,24 @@ class GUI():
             print minTime
             print maxTime
 
+            faceStr1 = self.OTHER_FACE_IDS % 1
+            faceStr2 = self.OTHER_FACE_IDS % 2
+            faceStr3 = self.OTHER_FACE_IDS % 3
+
             newShapes = {}
             for key2 in vals1:
                 print "Cutting curve: %s offset %f" % (key2,diffDict[key2])
                 if diffDict[key2] > 0.3:
                     newShapes[key2] = diffDict[key2]
                 cmds.keyframe(key2, edit=True, relative=True, time=(minTime, maxTime), valueChange=diffDict[key2], option="move")
+                cmds.keyframe(faceStr1 + key2, edit=True, relative=True, time=(minTime, maxTime), valueChange=diffDict[key2],
+                              option="move")
+                cmds.keyframe(faceStr2 + key2, edit=True, relative=True, time=(minTime, maxTime),
+                              valueChange=diffDict[key2],
+                              option="move")
+                cmds.keyframe(faceStr3 + key2, edit=True, relative=True, time=(minTime, maxTime),
+                              valueChange=diffDict[key2],
+                              option="move")
                 #cmds.cutKey(key2, time=(minTime, maxTime), option="keys") # or keys?
                 #cmds.pasteKey(key2, time=(minTime, maxTime), valueOffset = diffDict[key2], option="replace")
                 print "PASTED"
@@ -496,6 +509,9 @@ class GUI():
         maxTime = cmds.intField("endTime", query=True, value=True)
 
         strongestShapes = self.strongestShapes
+        faceStr1 = self.OTHER_FACE_IDS % 1
+        faceStr2 = self.OTHER_FACE_IDS % 2
+        faceStr3 = self.OTHER_FACE_IDS % 3
 
         largest = 0
         for key1,vals1 in strongestShapes.iteritems():
@@ -509,15 +525,22 @@ class GUI():
 
         print "Strongest: %s with %d\n" % (strongest, firstOfEach)
 
-        self.strongestShapes = strongestShapes[endKey].pop(0)
+        strongestShapes[endKey].pop(0)
+        self.strongestShapes = strongestShapes
 
         print self.strongestShapes
 
         for group,vals in self.newShapes.iteritems():
 
+            ranIntensity = random.uniform(-0.5, 1)
+            ranIntensity2 = random.uniform(-0.5, 1)
+            ranTime = random.uniform(-20, 20)
             for shape in vals:
                 cmds.copyKey(strongest, time=(minTime, maxTime), option="keys")  # or keys?
-                cmds.pasteKey(shape[0], time=(minTime, maxTime), valueOffset=shape[1], option="replace")
+                cmds.pasteKey(faceStr1 + shape[0], time=(minTime, maxTime), valueOffset=ranIntensity, option="replace")
+                cmds.pasteKey(faceStr2 + shape[0], time=(minTime, maxTime), valueOffset=random.gauss(ranIntensity2,0.5), option="replace")
+                cmds.pasteKey(faceStr3 + shape[0], time=(minTime, maxTime), timeOffset=random.gauss(ranTime,3),
+                              option="replace")
                 #cmds.pasteKey(shape[0], time=(minTime, maxTime), option="replace")
 
 
@@ -533,6 +556,7 @@ class Main(om.MPxCommand):
         om.MPxCommand.__init__(self)
         self.NEUTRAL_TIME = 0
         self.STARTING_TIME = 0
+        self.OTHER_FACE_IDS = ""
 
     def doIt(self, args):
 
@@ -543,8 +567,9 @@ class Main(om.MPxCommand):
         argVals = self.parseArguments(args)
         ctlId = argVals[0]
         self.NEUTRAL_TIME = argVals[1]
+        OTHER_FACE_IDS = argVals[2]
 
-        print "Args... CTLid: %s neutralFrame %i\n" % (ctlId,self.NEUTRAL_TIME)
+        print "Args... CTLid: %s neutralFrame %i ... other id str %s\n" % (ctlId,self.NEUTRAL_TIME, self.OTHER_FACE_IDS)
 
 
 
@@ -578,7 +603,7 @@ class Main(om.MPxCommand):
         print allSymmetryNames
 
         guiTemp = GUI(CTL_TREE,allStartingWeights,allNeutralWeights,allCurrentGenWeights,
-                      strongestShapes,minMaxWeights,allSymmetryNames)
+                      strongestShapes,minMaxWeights,allSymmetryNames,OTHER_FACE_IDS)
 
 
         # Skeleton working stub
@@ -599,6 +624,8 @@ class Main(om.MPxCommand):
         ctlLongFlagName = '-controllerIdentifierString'
         neutralShortFlagName = '-nf'
         neutralLongFlagName = '-neutralFrame'
+        otherFaceIdsLong = '-otherFaceIds'
+        otherFaceIdsShort = '-oid'
 
         # The following MArgParser object allows you to check if specific flags are set.
         argData = om.MArgParser(self.syntax(), args)
@@ -613,6 +640,10 @@ class Main(om.MPxCommand):
         if argData.isFlagSet(neutralLongFlagName):
             # In this case, we print the passed flags's three parameters, indexed from 0 to 2.
             flagParams.append(argData.flagArgumentDouble(neutralLongFlagName, 0))
+            noFlag = False
+        if argData.isFlagSet(otherFaceIdsLong):
+            # In this case, we print the passed flags's three parameters, indexed from 0 to 2.
+            flagParams.append(argData.flagArgumentString(otherFaceIdsShort, 0))
             noFlag = False
         if noFlag:
             sys.stderr.write(
@@ -766,4 +797,5 @@ class Main(om.MPxCommand):
             groupDict[key] = nodeDict
 
         return groupDict
+
 
