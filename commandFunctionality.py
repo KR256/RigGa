@@ -479,6 +479,7 @@ class GUI():
         self.newShapes = newShapesDict
         print self.newShapes
 
+
         #self.currentGenCurves = self.getCurrentCurves()
 
     def getCurve(self, curveName):
@@ -504,15 +505,10 @@ class GUI():
             curveDict[key1] = tempDict
         return curveDict
 
-    def sampleNewCurvesFromOld(self, *args):
-
-        minTime = cmds.intField("startTime", query=True, value=True)
-        maxTime = cmds.intField("endTime", query=True, value=True)
+    def getNextStrongestShape(self, *args):
 
         strongestShapes = self.strongestShapes
-        faceStr1 = self.OTHER_FACE_IDS % 1
-        faceStr2 = self.OTHER_FACE_IDS % 2
-        faceStr3 = self.OTHER_FACE_IDS % 3
+
 
         largest = 0
         for key1,vals1 in strongestShapes.iteritems():
@@ -534,27 +530,61 @@ class GUI():
 
         print self.strongestShapes
 
+        return strongest
+
+
+
+    def sampleNewCurvesFromOld(self, *args):
+
+        minTime = cmds.intField("startTime", query=True, value=True)
+        maxTime = cmds.intField("endTime", query=True, value=True)
+
+        faceStr1 = self.OTHER_FACE_IDS % 1
+        faceStr2 = self.OTHER_FACE_IDS % 2
+        faceStr3 = self.OTHER_FACE_IDS % 3
+
+        strongest = self.getNextStrongestShape()
+
+        # ranIntensity = random.uniform(-0.5, 0.7)
+        ranIntensity2 = random.uniform(-0.5, 0.7)
+        ranTime = random.randint(-20, 20)
+        print "ranIntensity: %f, ranTime: %i" % (ranIntensity2, ranTime)
+
         for group,vals in self.newShapes.iteritems():
 
-            ranIntensity = random.uniform(-0.5, 0.7)
-            ranIntensity2 = random.uniform(-0.5, 0.7)
-            ranTime = random.uniform(-20, 20)
+
             for shape in vals:
                 cmds.copyKey(strongest, time=(minTime, maxTime), option="keys")  # or keys?
-                cmds.pasteKey(faceStr1 + shape[0], time=(minTime, maxTime), valueOffset=ranIntensity, option="replace")
+                cmds.pasteKey(faceStr1 + shape[0], time=(minTime, maxTime), valueOffset=0.0, option="replace")
                 cmds.pasteKey(faceStr2 + shape[0], time=(minTime, maxTime), valueOffset=random.gauss(ranIntensity2,0.5), option="replace")
-                ranTime2 = random.gauss(ranTime,3)
-                cmds.pasteKey(faceStr3 + shape[0], time=(minTime, maxTime), timeOffset=ranTime2,
+                #ranTime2 = random.gauss(ranTime,3)
+                cmds.pasteKey(faceStr3 + shape[0], time=(minTime, maxTime), timeOffset=ranTime,
                               option="replace")
-                if ranTime2 >= 0:
-                    cmds.cutKey(faceStr3 + shape[0], time=(minTime, minTime + ranTime2), option="keys")
-                    cmds.cutKey(faceStr3 + shape[0], time=(maxTime, maxTime + ranTime2), option="keys")
+                if ranTime >= 0:
+                    cmds.cutKey(faceStr3 + shape[0], time=(minTime, minTime + ranTime), option="keys")
+                    cmds.cutKey(faceStr3 + shape[0], time=(maxTime, maxTime + ranTime), option="keys")
                 else:
-                    cmds.cutKey(faceStr3 + shape[0], time=(minTime + ranTime2, minTime), option="keys")
-                    cmds.cutKey(faceStr3 + shape[0], time=(maxTime + ranTime2, maxTime), option="keys")
+                    cmds.cutKey(faceStr3 + shape[0], time=(minTime + ranTime, minTime), option="keys")
+                    cmds.cutKey(faceStr3 + shape[0], time=(maxTime + ranTime, maxTime), option="keys")
                 #cmds.pasteKey(shape[0], time=(minTime, maxTime), option="replace")
 
-    def createAltGUI(self):
+        self.createAltGUI(strongest,ranIntensity2,ranTime)
+
+    def flattenDictToVals(self,dicto):
+
+        returnList = []
+        for vals in dicto.values():
+            print vals
+            if vals:
+                for nodes in vals:
+                    returnList.append(nodes[0])
+
+        return returnList
+
+    def createAltGUI(self, strongest,ranIntensity2,ranTime):
+
+        strongestDict = self.flattenDictToVals(self.strongestShapes)
+        print strongestDict
 
         selectionUI = 'altGUI'
 
@@ -576,19 +606,19 @@ class GUI():
         cmds.text("Set Timing Offset:", font="boldLabelFont", al="center")
 
         controlGroup = cmds.optionMenu("controlGroup", label='Current')
-        cmds.menuItem(label='All')
-        for key in range(3):
+        cmds.menuItem(label= strongest)
+        for key in strongestDict:
             cmds.menuItem(label=key)
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text("   Current:      ")
-        cmds.floatField(minValue=-1.0, maxValue=1.0, value=0.25, editable=True)
+        cmds.floatField(minValue=-1.0, maxValue=1.0, value=ranIntensity2, editable=True)
         cmds.button(label='Set')
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text("   Current:      ")
-        cmds.intField(minValue=1, maxValue=100, value=20, editable=True)
+        cmds.intField(minValue=-100, maxValue=100, value=ranTime, editable=True)
         cmds.button(label='Set')
         cmds.setParent('..')
 
@@ -621,6 +651,10 @@ class GUI():
         cmds.separator()
         cmds.separator()
         cmds.separator()
+
+        cmds.button(label='Add to Selection')
+        cmds.button(label='Add to Selection')
+        cmds.button(label='Add to Selection')
 
         cmds.setParent('..')
 
