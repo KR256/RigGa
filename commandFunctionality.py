@@ -78,6 +78,7 @@ class GUI():
         self.startingCurves = {}
         self.currentGenCurves = {}
         self.OTHER_FACE_IDS = OTHER_FACE_IDS
+        self.originalStrongest = strongestShapes
 
 
         winID = 'rigUI'
@@ -526,22 +527,156 @@ class GUI():
         print "Strongest: %s with %d\n" % (strongest, firstOfEach)
 
         strongestShapes[endKey].pop(0)
-        self.strongestShapes = strongestShapes
+        if all(not d for d in strongestShapes.values()):
+            self.strongestShapes = copy.deepcopy(self.originalStrongest)
+        else:
+            self.strongestShapes = strongestShapes
 
         print self.strongestShapes
 
         for group,vals in self.newShapes.iteritems():
 
-            ranIntensity = random.uniform(-0.5, 1)
-            ranIntensity2 = random.uniform(-0.5, 1)
+            ranIntensity = random.uniform(-0.5, 0.7)
+            ranIntensity2 = random.uniform(-0.5, 0.7)
             ranTime = random.uniform(-20, 20)
             for shape in vals:
                 cmds.copyKey(strongest, time=(minTime, maxTime), option="keys")  # or keys?
                 cmds.pasteKey(faceStr1 + shape[0], time=(minTime, maxTime), valueOffset=ranIntensity, option="replace")
                 cmds.pasteKey(faceStr2 + shape[0], time=(minTime, maxTime), valueOffset=random.gauss(ranIntensity2,0.5), option="replace")
-                cmds.pasteKey(faceStr3 + shape[0], time=(minTime, maxTime), timeOffset=random.gauss(ranTime,3),
+                ranTime2 = random.gauss(ranTime,3)
+                cmds.pasteKey(faceStr3 + shape[0], time=(minTime, maxTime), timeOffset=ranTime2,
                               option="replace")
+                if ranTime2 >= 0:
+                    cmds.cutKey(faceStr3 + shape[0], time=(minTime, minTime + ranTime2), option="keys")
+                    cmds.cutKey(faceStr3 + shape[0], time=(maxTime, maxTime + ranTime2), option="keys")
+                else:
+                    cmds.cutKey(faceStr3 + shape[0], time=(minTime + ranTime2, minTime), option="keys")
+                    cmds.cutKey(faceStr3 + shape[0], time=(maxTime + ranTime2, maxTime), option="keys")
                 #cmds.pasteKey(shape[0], time=(minTime, maxTime), option="replace")
+
+    def createAltGUI(self):
+
+        selectionUI = 'altGUI'
+
+        import maya.cmds as cmds
+        selectionUI = 'altUI'
+
+        if cmds.window(selectionUI, exists=True):
+            cmds.deleteUI(selectionUI)
+
+        cmds.window(selectionUI, width=600, height=100)
+        form = cmds.formLayout()
+        tabs = cmds.tabLayout(innerMarginWidth=10, innerMarginHeight=10, mcw=400, width=750, height=100)
+        cmds.formLayout(form, edit=True,
+                        attachForm=((tabs, 'top', 0), (tabs, 'left', 0), (tabs, 'bottom', 0), (tabs, 'right', 0)))
+
+        child1 = cmds.gridLayout(numberOfColumns=3, cellWidthHeight=(250, 32))
+        cmds.text("Set Sample Curve:", font="boldLabelFont", al="center")
+        cmds.text("Set Intensity:", font="boldLabelFont", al="center")
+        cmds.text("Set Timing Offset:", font="boldLabelFont", al="center")
+
+        controlGroup = cmds.optionMenu("controlGroup", label='Current')
+        cmds.menuItem(label='All')
+        for key in range(3):
+            cmds.menuItem(label=key)
+        cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
+                       columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
+        cmds.text("   Current:      ")
+        cmds.floatField(minValue=-1.0, maxValue=1.0, value=0.25, editable=True)
+        cmds.button(label='Set')
+        cmds.setParent('..')
+        cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
+                       columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
+        cmds.text("   Current:      ")
+        cmds.intField(minValue=1, maxValue=100, value=20, editable=True)
+        cmds.button(label='Set')
+        cmds.setParent('..')
+
+        cmds.separator()
+        cmds.separator()
+        cmds.separator()
+
+        cmds.text("Sample From Strongest Curves:", font="boldLabelFont", al="center")
+        cmds.text("Sample Intensity:", font="boldLabelFont", al="center")
+        cmds.text("Sample Timing Offset:", font="boldLabelFont", al="center")
+
+        cmds.rowLayout(numberOfColumns=2, adjustableColumn=2, columnAlign=(1, 'right'),
+                       columnAttach=[(1, 'left', 0), (2, 'right', 0)])
+        cmds.text("              ")
+        cmds.button(label='Sample', width=50)
+        cmds.setParent('..')
+        cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
+                       columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
+        cmds.text("    Limit +/-:    ")
+        cmds.floatField(minValue=-1.0, maxValue=1.0, value=0.25, editable=True)
+        cmds.button(label='Sample')
+        cmds.setParent('..')
+        cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
+                       columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
+        cmds.text("    Limit +/-:    ")
+        cmds.intField(minValue=1, maxValue=100, value=20, editable=True)
+        cmds.button(label='Sample')
+        cmds.setParent('..')
+
+        cmds.separator()
+        cmds.separator()
+        cmds.separator()
+
+        cmds.setParent('..')
+
+        child2 = cmds.gridLayout(numberOfColumns=3, cellWidthHeight=(250, 40))
+        cmds.text("FACE 1:", font="boldLabelFont", al="center")
+        cmds.text("FACE 2:", font="boldLabelFont", al="center")
+        cmds.text("FACE 3:", font="boldLabelFont", al="center")
+
+        str1 = "Sample Curve = %s\nIntensity = %f\nTiming Offset = %i" % ("brows_l_CTL", 0.52, 15)
+        cmds.text(str1, font="boldLabelFont", al="center")
+        cmds.text(str1, font="boldLabelFont", al="center")
+        cmds.text(str1, font="boldLabelFont", al="center")
+
+        cmds.rowLayout(numberOfColumns=2, adjustableColumn=2, columnAlign=(1, 'right'),
+                       columnAttach=[(1, 'left', 0), (2, 'right', 0)])
+        cmds.text("                                ")
+        cmds.checkBox(editable=True, label="  Select")
+        cmds.setParent('..')
+        cmds.rowLayout(numberOfColumns=2, adjustableColumn=2, columnAlign=(1, 'right'),
+                       columnAttach=[(1, 'left', 0), (2, 'right', 0)])
+        cmds.text("                                ")
+        cmds.checkBox(editable=True, label="  Select")
+        cmds.setParent('..')
+        cmds.rowLayout(numberOfColumns=2, adjustableColumn=2, columnAlign=(1, 'right'),
+                       columnAttach=[(1, 'left', 0), (2, 'right', 0)])
+        cmds.text("                                ")
+        cmds.checkBox(editable=True, label="  Select")
+        cmds.setParent('..')
+
+        cmds.separator()
+        cmds.separator()
+        cmds.separator()
+
+        cmds.rowLayout(numberOfColumns=2, adjustableColumn=2, columnAlign=(1, 'right'),
+                       columnAttach=[(1, 'left', 0), (2, 'right', 0)])
+        cmds.button(label="  <   Previous   ")
+        cmds.text("                                ")
+        cmds.setParent('..')
+        cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
+                       columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
+        cmds.text("Select Elite:")
+        cmds.intField(minValue=1, maxValue=100, value=20, editable=True)
+        cmds.button(label='Breed Next Gen')
+        cmds.setParent('..')
+        cmds.rowLayout(numberOfColumns=2, adjustableColumn=2, columnAlign=(1, 'right'),
+                       columnAttach=[(1, 'left', 0), (2, 'right', 0)])
+        cmds.text("                                              ")
+        cmds.button(label="   Next   > ")
+        cmds.setParent('..')
+
+        cmds.setParent('..')
+
+        cmds.tabLayout(tabs, edit=True, tabLabel=((child1, '\t\t\t\t\t\t\t\t\tSampling\t\t\t\t\t\t\t\t\t'),
+                                                  (child2, '\t\t\t\t\t\t\t\t\tEvolution\t\t\t\t\t\t\t\t\t')))
+
+        cmds.showWindow()
 
 
 
