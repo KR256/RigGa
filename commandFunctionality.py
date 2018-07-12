@@ -459,7 +459,7 @@ class GUI():
 			for key2 in vals1:
 
 				nSId = key2.find(':')
-				if nSId:
+				if nSId != -1:
 					out1 = key2[:nSId] + str(1) + key2[nSId:]
 					out2 = key2[:nSId] + str(2) + key2[nSId:]
 					out3 = key2[:nSId] + str(3) + key2[nSId:]
@@ -570,7 +570,7 @@ class GUI():
 
 
 				nSId = shape[0].find(':')
-				if nSId:
+				if nSId != -1:
 					out1 = shape[0][:nSId] + str(1) + shape[0][nSId:]
 					out2 = shape[0][:nSId] + str(2) + shape[0][nSId:]
 					out3 = shape[0][:nSId] + str(3) + shape[0][nSId:]

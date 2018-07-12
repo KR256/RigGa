@@ -5,6 +5,8 @@ import random
 import copy
 from functools import partial
 
+import nonLinearGUI
+
 class CTLnode():
 
     def __init__(self,longname, translateName, weightDict, weightMinMax,shortGroupName):
@@ -55,6 +57,12 @@ class CTLnode():
     def setWeight(self, newWeight):
         cmds.setAttr(self.translateName, newWeight)
         self.weight = newWeight
+
+
+
+
+
+
 
 ##########################################################
 # Plug-in
@@ -114,8 +122,8 @@ class Main(om.MPxCommand):
 
         print allSymmetryNames
 
-        # guiTemp = GUI(CTL_TREE,allStartingWeights,allNeutralWeights,allCurrentGenWeights,
-        # 			  strongestShapes,minMaxWeights,allSymmetryNames,self.OTHER_FACE_IDS)
+        guiTemp = nonLinearGUI.GUI(CTL_TREE,allStartingWeights,allNeutralWeights,allCurrentGenWeights,
+                      strongestShapes,minMaxWeights,allSymmetryNames,self.OTHER_FACE_IDS)
 
 
         # Skeleton working stub
@@ -308,3 +316,6 @@ class Main(om.MPxCommand):
             groupDict[key] = nodeDict
 
         return groupDict
+
+
+
