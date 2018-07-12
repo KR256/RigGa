@@ -554,9 +554,12 @@ class GUI():
 
 
             for shape in vals:
+                ranGauss = random.gauss(ranIntensity2,0.5)
+                print "ranGauss: %f" % (ranGauss)
+
                 cmds.copyKey(strongest, time=(minTime, maxTime), option="keys")  # or keys?
                 cmds.pasteKey(faceStr1 + shape[0], time=(minTime, maxTime), valueOffset=0.0, option="replace")
-                cmds.pasteKey(faceStr2 + shape[0], time=(minTime, maxTime), valueOffset=random.gauss(ranIntensity2,0.5), option="replace")
+                cmds.pasteKey(faceStr2 + shape[0], time=(minTime, maxTime), valueOffset=ranGauss, option="replace")
                 #ranTime2 = random.gauss(ranTime,3)
                 cmds.pasteKey(faceStr3 + shape[0], time=(minTime, maxTime), timeOffset=ranTime,
                               option="replace")
@@ -584,6 +587,7 @@ class GUI():
     def createAltGUI(self, strongest,ranIntensity2,ranTime):
 
         strongestDict = self.flattenDictToVals(self.strongestShapes)
+        newShapes = self.flattenDictToVals(self.newShapes)
         print strongestDict
 
         selectionUI = 'altGUI'
@@ -594,64 +598,75 @@ class GUI():
         if cmds.window(selectionUI, exists=True):
             cmds.deleteUI(selectionUI)
 
-        cmds.window(selectionUI, width=600, height=100)
+        cmds.window(selectionUI, width=1000, height=100)
         form = cmds.formLayout()
-        tabs = cmds.tabLayout(innerMarginWidth=10, innerMarginHeight=10, mcw=400, width=750, height=100)
+        tabs = cmds.tabLayout(innerMarginWidth=10, innerMarginHeight=10, mcw=400, width=1000, height=300)
         cmds.formLayout(form, edit=True,
                         attachForm=((tabs, 'top', 0), (tabs, 'left', 0), (tabs, 'bottom', 0), (tabs, 'right', 0)))
 
-        child1 = cmds.gridLayout(numberOfColumns=3, cellWidthHeight=(250, 32))
-        cmds.text("Set Sample Curve:", font="boldLabelFont", al="center")
+        child1 = cmds.gridLayout(numberOfColumns=4, cellWidthHeight=(250, 32))
+        cmds.text("Set Source Shapes:", font="boldLabelFont", al="center")
+        cmds.text("Set Target Curve:", font="boldLabelFont", al="center")
         cmds.text("Set Intensity:", font="boldLabelFont", al="center")
         cmds.text("Set Timing Offset:", font="boldLabelFont", al="center")
 
-        controlGroup = cmds.optionMenu("controlGroup", label='Current')
+        controlGroupSource = cmds.optionMenu("controlGroupSource")
+        cmds.menuItem(label='All')
+        for key1 in newShapes:
+            cmds.menuItem(label=key1)
+        controlGroupTarget = cmds.optionMenu("controlGroupTarget")
         cmds.menuItem(label= strongest)
         for key in strongestDict:
             cmds.menuItem(label=key)
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
-        cmds.text("   Current:      ")
-        cmds.floatField(minValue=-1.0, maxValue=1.0, value=ranIntensity2, editable=True)
+        # cmds.button(label='Set')
+        cmds.floatSliderGrp(field=True, minValue=-1.0, maxValue=1.0, fieldMinValue=-1.0,
+                            fieldMaxValue=1.0, value=ranIntensity2, cw = [(1,50),(2,120)])
         cmds.button(label='Set')
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
-        cmds.text("   Current:      ")
-        cmds.intField(minValue=-100, maxValue=100, value=ranTime, editable=True)
+        cmds.intSliderGrp(field=True, minValue=-20, maxValue=20, fieldMinValue=-100,
+                            fieldMaxValue=100, value=ranTime, cw = [(1,50),(2,120)])
         cmds.button(label='Set')
         cmds.setParent('..')
 
         cmds.separator()
         cmds.separator()
         cmds.separator()
+        cmds.separator()
 
-        cmds.text("Sample From Strongest Curves:", font="boldLabelFont", al="center")
+        cmds.text("             ")
+        cmds.text("Random Curve:", font="boldLabelFont", al="center")
         cmds.text("Sample Intensity:", font="boldLabelFont", al="center")
         cmds.text("Sample Timing Offset:", font="boldLabelFont", al="center")
 
+        cmds.text("             ")
         cmds.rowLayout(numberOfColumns=2, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'right', 0)])
-        cmds.text("              ")
+        cmds.text("")
         cmds.button(label='Sample', width=50)
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
-        cmds.text("    Limit +/-:    ")
-        cmds.floatField(minValue=-1.0, maxValue=1.0, value=0.25, editable=True)
+        cmds.floatSliderGrp(field=True, minValue=-1.0, maxValue=1.0, fieldMinValue=-1.0,
+                            fieldMaxValue=1.0, value=0.25, cw = [(1,50),(2,120)])
         cmds.button(label='Sample')
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
-        cmds.text("    Limit +/-:    ")
-        cmds.intField(minValue=1, maxValue=100, value=20, editable=True)
+        cmds.intSliderGrp(field=True, minValue=-20, maxValue=20, fieldMinValue=-100,
+                          fieldMaxValue=100, value=20, cw = [(1,50),(2,120)])
         cmds.button(label='Sample')
         cmds.setParent('..')
 
         cmds.separator()
         cmds.separator()
         cmds.separator()
+        cmds.separator()
 
+        cmds.text('Current Elite', font="boldLabelFont", al="center")
         cmds.button(label='Add to Selection')
         cmds.button(label='Add to Selection')
         cmds.button(label='Add to Selection')
