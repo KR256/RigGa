@@ -31,6 +31,7 @@ class GUI():
         self.OTHER_FACE_IDS = OTHER_FACE_IDS
         self.originalStrongest = strongestShapes
         self.symGroups = {}
+        self.lastElite = self.saveFaceCurves()
 
         print "strongestShapes"
         print strongestShapes
@@ -168,7 +169,7 @@ class GUI():
         controlGroup = cmds.optionMenu("controlGroup")
         for key in range(1, 4):
             cmds.menuItem(label="SAMPLE " + str(key))
-        cmds.button(label='    Set    ')
+        cmds.button(label='    Set    ', command=partial(self.setFaceAsElite))
         cmds.setParent('..')
         cmds.text("New Curves:", font="boldLabelFont", al="center")
         cmds.text("Modify Curves:", font="boldLabelFont", al="center")
@@ -182,10 +183,10 @@ class GUI():
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="                 ")
         cmds.button(label='Reset Samples to Elite', command=partial(self.copyEliteToSamples,self.strongestShapesTree))
-        cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
-                       columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="                 ")
         cmds.setParent('..')
+        cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
+                       columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="                 Number of New Keys:")
         cmds.intField("numKeys",minValue=1, maxValue=4, value=2, editable=True)
         cmds.text(label="                ")
@@ -208,7 +209,7 @@ class GUI():
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="                 ")
-        cmds.button(label='Reset to Last Elite')
+        cmds.button(label='Reset to Last Elite', command=partial(self.resetToLastElite))
         cmds.text(label="                 ")
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
@@ -525,3 +526,63 @@ class GUI():
 
         self.symGroups = returnDict
         return returnList
+
+    def setFaceAsElite(self, *args):
+
+        self.lastElite = self.saveFaceCurves()
+
+        eliteChoice = cmds.optionMenu("controlGroup", value=True, query=True)
+        eliteNum = int(eliteChoice[-1])
+
+        shapeTree = self.strongestShapesTree
+
+        for faceGroup, ctlDict in shapeTree.iteritems():
+
+            for ctlName, ctlVal in ctlDict.iteritems():
+
+                nSId = ctlName.find(':')
+                if nSId != -1:
+                    print "in"
+                    out1 = ctlName[:nSId] + str(eliteNum) + ctlName[nSId:]
+
+                else:
+                    out1 = (self.OTHER_FACE_IDS + ctlName) % eliteNum
+
+                cmds.cutKey(ctlName, time=(2, 199), option="keys")
+                cmds.copyKey(out1, time=(1, 250), option="keys")  # or keys?
+                cmds.pasteKey(ctlName, time=(1, 250), option="replace")
+
+    def saveFaceCurves(self):
+
+        shapeTree = self.strongestShapesTree
+
+        outDict = {}
+        for faceGroup, ctlDict in shapeTree.iteritems():
+            outGroup = {}
+            for ctlName, ctlVal in ctlDict.iteritems():
+                keys = cmds.keyframe(ctlName, time=(1, 250), valueChange=True, query=True)
+                times = cmds.keyframe(ctlName, time=(1, 250), timeChange=True, query=True)
+
+                outGroup[ctlName] = (keys, times)
+            outDict[faceGroup] = outGroup
+
+        return outDict
+
+    def resetToLastElite(self, *args):
+
+        lastElite = self.lastElite
+
+        outDict = {}
+        for faceGroup, ctlDict in lastElite.iteritems():
+            for ctlName, ctlVal in ctlDict.iteritems():
+                cmds.cutKey(ctlName, time=(2, 199), option="keys")
+                for keyId, keys in enumerate(ctlVal[0]):
+                    times = ctlVal[1][keyId]
+
+                    cmds.setKeyframe(ctlName, t=(times, times), v=keys)
+
+
+
+
+
+
