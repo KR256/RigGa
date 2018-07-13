@@ -2,7 +2,7 @@ import sys
 import maya.api.OpenMaya as om
 import maya.cmds as cmds
 import random
-import copy
+from sets import Set
 from functools import partial
 
 ##########################################################
@@ -29,8 +29,30 @@ class GUI():
         self.currentGenCurves = {}
         self.OTHER_FACE_IDS = OTHER_FACE_IDS
         self.originalStrongest = strongestShapes
+        self.symGroups = {}
 
-        self.linearBlendshape(allStartingWeights)
+        print "strongestShapes"
+        print strongestShapes
+
+        newShapes = self.flattenDictToVals(self.strongestShapes)
+        targetShapes = self.flattenDictToChildren(self.strongestShapes)
+        # strongestShapesNeutrals = self.getStrongestNeutralVals(self.strongestShapes)
+
+        # self.strongestShapesNeutrals = strongestShapesNeutrals
+
+        print "newShapes:"
+        print newShapes
+        print "targetShapes"
+        print targetShapes
+        # print "strongestShapesNeutrals"
+        # print strongestShapesNeutrals
+
+        flattenedSyms = self.flattenDictToChildren(self.allSymmetryNames)
+
+        newShapesSym = self.correctSymmetryNames(newShapes, flattenedSyms)
+
+        self.linearBlendshape(self.allStartingWeights)
+        self.sampleNonLinear(2)
 
         import maya.cmds as cmds
         selectionUI = 'altUI'
@@ -110,9 +132,10 @@ class GUI():
         child1 = cmds.gridLayout(numberOfColumns=4, cellWidthHeight=(300, 32))
         cmds.text("ELITE:", font="boldLabelFont", al="center")
         cmds.text("Choose Curve to Act on:", font="boldLabelFont", al="center")
-        controlGroup = cmds.optionMenu("controlGroup")
-        for key in range(1, 4):
-            cmds.menuItem(label="SAMPLE " + str(key))
+        controlGroupSource = cmds.optionMenu("controlGroupSource")
+        cmds.menuItem(label='All')
+        for key1 in newShapesSym:
+            cmds.menuItem(label=key1)
         cmds.text("OPTIONS:", font="boldLabelFont", al="center")
 
         cmds.text(label='')
@@ -121,7 +144,7 @@ class GUI():
         cmds.rowLayout(numberOfColumns=2, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'right', 0)])
         cmds.text("                                ")
-        cmds.checkBox(editable=True, label="  Symmetry")
+        cmds.checkBox(editable=True, label="  Symmetry", value=True)
         cmds.setParent('..')
 
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
@@ -137,14 +160,14 @@ class GUI():
         cmds.rowLayout(numberOfColumns=2, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'right', 0)])
         cmds.text("                                ")
-        cmds.checkBox(editable=True, label="  Localise sampling")
+        cmds.checkBox("localiseFlag",editable=True, label="  Localise sampling")
         cmds.setParent('..')
 
         cmds.text(label="                 ")
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="                 Number of New Keys:")
-        cmds.intField(minValue=1, maxValue=4, value=2, editable=True)
+        cmds.intField("numKeys",minValue=1, maxValue=4, value=2, editable=True)
         cmds.text(label="                ")
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
@@ -198,6 +221,9 @@ class GUI():
                 cmds.setKeyframe(ctlName, t=(250, 250), v=ctlVal)
                 cmds.setKeyframe(ctlName, t=(200, 200), v=ctlVal)
 
+        self.copyEliteToSamples(self.allStartingWeights)
+
+    def copyEliteToSamples(self, blendshapeTargetTree):
 
         for faceGroup, ctlDict in blendshapeTargetTree.iteritems():
 
@@ -224,7 +250,13 @@ class GUI():
 
     def sampleNonLinear(self, numKeys, *args):
 
-        self.linearBlendshape(self.allStartingWeights)
+        if numKeys < 0:
+            numKeys = cmds.intField("numKeys", value=True, query=True)
+            localiseFlag = cmds.checkBox("localiseFlag", value=True, query=True)
+
+        # if localiseFlag:
+        #     self.copyEliteToSamples(self.allStartingWeights)
+        # else:
 
         blendshapeTargetTree = self.allStartingWeights
         blendshapeSourceTree = self.allNeutralWeights
@@ -255,3 +287,64 @@ class GUI():
                             outTransform = outTransform + ctlName
 
                         cmds.setKeyframe(outTransform, t=(randTime,randTime), v=sampleVal)
+
+    def flattenDictToVals(self, dicto):
+
+        returnList = []
+        for vals in dicto.values():
+            print vals
+            if vals:
+                for nodes in vals:
+                    returnList.append(nodes[0])
+
+        return returnList
+
+    def flattenDictToChildren(self, dicto):
+
+        returnDict = {}
+        for vals in dicto.values():
+            if vals:
+                print "vals:"
+                print vals
+                returnDict.update(vals)
+
+        return returnDict
+
+    # def getStrongestNeutralVals(self, strongestShapes):
+    #
+    #     neutralTree = self.allNeutralWeights
+    #     returnDict = {}
+    #     for keys, vals in strongestShapes.iteritems():
+    #         for keys2, vals2 in vals.iteritems():
+    #             returnDict[keys][keys2] = neutralTree[keys][keys2]
+    #
+    #     return returnDict
+
+    def correctSymmetryNames(self, flattened, flattenedSyms):
+
+        returnList = []
+        returnDict = {}
+
+        print "flattened , flattenedSymn"
+        print flattened
+        print flattenedSyms
+        print "end"
+        for vid,vals in enumerate(flattened):
+            print vals
+            symVal = flattenedSyms[vals]
+            if (symVal in flattened) and (vals != symVal):
+                flattened.pop(vid)
+                setVal = Set(vals.split('_'))
+                print setVal
+                setSymVal = Set(symVal.split('_'))
+                print setSymVal
+                seq = '_'.join(setVal & setSymVal)
+                print "seq:"
+                print seq
+                returnList.append(seq)
+                returnDict[seq] = (vals,symVal)
+            else:
+                returnList.append(vals)
+
+        self.symGroups = returnDict
+        return returnList
