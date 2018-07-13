@@ -20,6 +20,7 @@ class GUI():
         self.allNeutralWeights = allNeutralWeights
         self.allMinMaxWeights = minMaxWeights
         self.strongestShapes = strongestShapes
+        self.strongestShapesTree = {}
         self.generationSelection = []
         self.nextGeneration = []
         self.allSymmetryNames = allSymmetryNames
@@ -36,6 +37,7 @@ class GUI():
 
         newShapes = self.flattenDictToVals(self.strongestShapes)
         targetShapes = self.flattenDictToChildren(self.strongestShapes)
+        strongestShapesTree = self.cropTreeToStrongestShapes()
         # strongestShapesNeutrals = self.getStrongestNeutralVals(self.strongestShapes)
 
         # self.strongestShapesNeutrals = strongestShapesNeutrals
@@ -44,14 +46,19 @@ class GUI():
         print newShapes
         print "targetShapes"
         print targetShapes
+        print "strongestShapesTree"
+        print strongestShapesTree
         # print "strongestShapesNeutrals"
         # print strongestShapesNeutrals
+
+        self.strongestShapesTree = strongestShapesTree
 
         flattenedSyms = self.flattenDictToChildren(self.allSymmetryNames)
 
         newShapesSym = self.correctSymmetryNames(newShapes, flattenedSyms)
 
-        self.linearBlendshape(self.allStartingWeights)
+
+        self.linearBlendshape(self.strongestShapesTree)
         self.sampleNonLinear(2)
 
         import maya.cmds as cmds
@@ -130,6 +137,14 @@ class GUI():
         cmds.setParent('..')
 
         child1 = cmds.gridLayout(numberOfColumns=4, cellWidthHeight=(300, 32))
+        cmds.text(label = "")
+        cmds.text("Choose Group to Act on:", font="boldLabelFont", al="center")
+        controlGroupSourceGroup = cmds.optionMenu("controlGroupSourceGroup")
+        cmds.menuItem(label='All')
+        for key1 in strongestShapesTree.keys():
+            cmds.menuItem(label=key1)
+        cmds.text(label="")
+
         cmds.text("ELITE:", font="boldLabelFont", al="center")
         cmds.text("Choose Curve to Act on:", font="boldLabelFont", al="center")
         controlGroupSource = cmds.optionMenu("controlGroupSource")
@@ -163,9 +178,14 @@ class GUI():
         cmds.checkBox("localiseFlag",editable=True, label="  Localise sampling")
         cmds.setParent('..')
 
-        cmds.text(label="                 ")
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
+        cmds.text(label="                 ")
+        cmds.button(label='Reset Samples to Elite', command=partial(self.copyEliteToSamples,self.strongestShapesTree))
+        cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
+                       columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
+        cmds.text(label="                 ")
+        cmds.setParent('..')
         cmds.text(label="                 Number of New Keys:")
         cmds.intField("numKeys",minValue=1, maxValue=4, value=2, editable=True)
         cmds.text(label="                ")
@@ -173,15 +193,15 @@ class GUI():
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="                 ")
-        cmds.button(label='Sample Curve Amplitude')
+        cmds.button(label='Sample Curve Amplitude', command=partial(self.sampleAmpPhase , "Amp"))
         cmds.text(label="                 ")
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)], w=100)
 
         cmds.text(label='                S.D: ')
-        cmds.floatSliderGrp(field=True, minValue=0.0, maxValue=5.0, fieldMinValue=0.0,
-                            fieldMaxValue=5.0, value=1.0, cw=[(1, 50), (2, 120)])
+        cmds.floatSliderGrp("sdVal", field=True, minValue=0.0, maxValue=1.0, fieldMinValue=0.0,
+                            fieldMaxValue=1.0, value=0.3, cw=[(1, 50), (2, 120)])
         cmds.text(label='                   ')
         cmds.setParent('..')
 
@@ -194,13 +214,13 @@ class GUI():
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="                 ")
-        cmds.button(label='Sample')
+        cmds.button(label='Sample', command=partial(self.sampleNonLinear,-1))
         cmds.text(label="                 ")
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="                 ")
-        cmds.button(label='Sample Curve Phase')
+        cmds.button(label='Sample Curve Phase', command=partial(self.sampleAmpPhase , "Phase"))
         cmds.text(label="                 ")
         cmds.setParent('..')
         cmds.text(label="                 ")
@@ -221,9 +241,9 @@ class GUI():
                 cmds.setKeyframe(ctlName, t=(250, 250), v=ctlVal)
                 cmds.setKeyframe(ctlName, t=(200, 200), v=ctlVal)
 
-        self.copyEliteToSamples(self.allStartingWeights)
+        self.copyEliteToSamples(self.strongestShapesTree)
 
-    def copyEliteToSamples(self, blendshapeTargetTree):
+    def copyEliteToSamples(self, blendshapeTargetTree, *args):
 
         for faceGroup, ctlDict in blendshapeTargetTree.iteritems():
 
@@ -253,40 +273,179 @@ class GUI():
         if numKeys < 0:
             numKeys = cmds.intField("numKeys", value=True, query=True)
             localiseFlag = cmds.checkBox("localiseFlag", value=True, query=True)
+            selectedGroup = cmds.optionMenu("controlGroupSourceGroup", value=True, query=True)
+            selectedCurve = cmds.optionMenu("controlGroupSource", value=True, query=True)
+
+        else:
+            selectedGroup = 'All'
+            selectedCurve = 'All'
 
         # if localiseFlag:
         #     self.copyEliteToSamples(self.allStartingWeights)
         # else:
 
-        blendshapeTargetTree = self.allStartingWeights
+        blendshapeTargetTree = self.strongestShapesTree
         blendshapeSourceTree = self.allNeutralWeights
 
         for sampleFace in range(1,4):
 
-            for keyId in range(numKeys):
+            ranSampTime = sorted ( random.sample(range(2, 199), numKeys) , reverse=True)
+            ranSampValTemp = [random.random() for _ in range(numKeys)]
+            print ranSampValTemp
+            ranSampVal = sorted(ranSampValTemp,reverse=True)
+            print ranSampVal
+            print ranSampTime
 
-                if keyId == 0:
-                    randTime = random.uniform(1,200)
-                    randScale = random.uniform(0, 1)
-                else:
-                    randTime = random.uniform(1, randTime)
-                    randScale = random.uniform(0, randScale)
+            for faceGroup, ctlDict in blendshapeTargetTree.iteritems():
 
-                for faceGroup, ctlDict in blendshapeTargetTree.iteritems():
+                if  selectedGroup == faceGroup:
+                    print "Selected Group True"
+                    ranSampTime = sorted(random.sample(range(2, 199), numKeys) , reverse=True)
+                    ranSampValTemp = [random.random() for _ in range(numKeys)]
+                    ranSampVal = sorted(ranSampValTemp,reverse=True)
 
+                if selectedGroup == faceGroup or selectedGroup == 'All':
                     for ctlName, ctlVal in ctlDict.iteritems():
 
-                        neutralVal = blendshapeSourceTree[faceGroup][ctlName]
-                        sampleVal = neutralVal + ( randScale * (ctlVal - neutralVal) )
+                        if selectedCurve != 'All':
+                            if self.symGroups[selectedCurve][0] == ctlName:
+                                print "Selected Curve True"
+                                ranSampTime2 = sorted(random.sample(range(2,199), numKeys) , reverse=True)
+                                ranSampValTemp2= [random.random() for _ in range(numKeys)]
+                                ranSampVal2 = sorted(ranSampValTemp2,reverse=True)
 
-                        nSId = ctlName.find(':')
-                        if nSId != -1:
-                            outTransform = ctlName[:nSId] + str(sampleFace) + ctlName[nSId:]
+                                self.individualCurveSample(ctlName, faceGroup, ranSampTime2, ranSampVal2, ctlVal,
+                                                           sampleFace)
+                                self.individualCurveSample(self.symGroups[selectedCurve][1], faceGroup, ranSampTime2, ranSampVal2, ctlVal,
+                                                           sampleFace)
                         else:
-                            outTransform = self.OTHER_FACE_IDS % sampleFace
-                            outTransform = outTransform + ctlName
+                            self.individualCurveSample(ctlName, faceGroup, ranSampTime, ranSampVal, ctlVal, sampleFace)
 
-                        cmds.setKeyframe(outTransform, t=(randTime,randTime), v=sampleVal)
+
+
+    def individualCurveSample(self, curveName, faceGroup, ranSampTime, ranSampVal, ctlVal, sampleFace):
+
+        nSId = curveName.find(':')
+        if nSId != -1:
+            outTransform = curveName[:nSId] + str(sampleFace) + curveName[nSId:]
+        else:
+            outTransform = self.OTHER_FACE_IDS % sampleFace
+            outTransform = outTransform + curveName
+
+        cmds.cutKey(outTransform, time=(2, 199), option="keys")
+
+
+        for keyId,ranKey in enumerate(ranSampVal):
+
+            randTime = ranSampTime[keyId]
+
+            neutralVal = self.allNeutralWeights[faceGroup][curveName]
+            sampleVal = neutralVal + (ranKey * (ctlVal - neutralVal))
+
+
+
+            cmds.setKeyframe(outTransform, t=(randTime, randTime), v=sampleVal)
+
+    def sampleAmpPhase(self, ampOrPhase, *args):
+
+
+        localiseFlag = cmds.checkBox("localiseFlag", value=True, query=True)
+        selectedGroup = cmds.optionMenu("controlGroupSourceGroup", value=True, query=True)
+        selectedCurve = cmds.optionMenu("controlGroupSource", value=True, query=True)
+        sdVal = cmds.floatSliderGrp("sdVal", value=True, query=True)
+
+
+        blendshapeTargetTree = self.strongestShapesTree
+        blendshapeSourceTree = self.allNeutralWeights
+
+        for sampleFace in range(1,4):
+
+            if localiseFlag:
+                ranShiftAmp = [random.uniform(1 - sdVal,1 + sdVal) for _ in range(6)]
+                ranShiftPhase = [random.uniform(1 - sdVal,1 + sdVal) for _ in range(6)]
+            else:
+                ranShiftAmp = random.uniform(-0.3,0.3)
+                ranShiftPhase = random.uniform(-20, 20)
+
+            for faceGroup, ctlDict in blendshapeTargetTree.iteritems():
+
+                if  selectedGroup == faceGroup:
+                    print "Selected Group True"
+                    if localiseFlag:
+                        ranShiftAmp = [random.uniform(1 - sdVal, 1 + sdVal) for _ in range(6)]
+                        ranShiftPhase = [random.uniform(1 - sdVal, 1 + sdVal) for _ in range(6)]
+                    else:
+                        ranShiftAmp = random.uniform(-0.3, 0.3)
+                        ranShiftPhase = random.uniform(-20, 20)
+
+                if selectedGroup == faceGroup or selectedGroup == 'All':
+                    for ctlName, ctlVal in ctlDict.iteritems():
+
+                        if selectedCurve != 'All':
+                            if self.symGroups[selectedCurve][0] == ctlName:
+                                print "Selected Curve True"
+                                if localiseFlag:
+                                    ranShiftAmp2 = [random.uniform(1 - sdVal, 1 + sdVal) for _ in range(6)]
+                                    ranShiftPhase2 = [random.uniform(1 - sdVal, 1 + sdVal) for _ in range(6)]
+                                else:
+                                    ranShiftAmp2 = random.uniform(-0.3, 0.3)
+                                    ranShiftPhase2 = random.uniform(-20, 20)
+
+                                self.individualCurveAmpPhaseSample(ctlName, faceGroup, ranShiftPhase2, ranShiftAmp2, ctlVal,
+                                                           sampleFace, localiseFlag, ampOrPhase)
+                                self.individualCurveAmpPhaseSample(self.symGroups[selectedCurve][1], faceGroup, ranShiftPhase2, ranShiftAmp2, ctlVal,
+                                                           sampleFace, localiseFlag, ampOrPhase)
+                        else:
+                            self.individualCurveAmpPhaseSample(ctlName, faceGroup, ranShiftPhase, ranShiftAmp, ctlVal,
+                                                               sampleFace, localiseFlag, ampOrPhase)
+
+    def individualCurveAmpPhaseSample(self, curveName, faceGroup, ranSampTime, ranSampVal,
+                                      ctlVal, sampleFace, localiseFlag, ampOrPhase):
+
+        nSId = curveName.find(':')
+        if nSId != -1:
+            outTransform = curveName[:nSId] + str(sampleFace) + curveName[nSId:]
+        else:
+            outTransform = self.OTHER_FACE_IDS % sampleFace
+            outTransform = outTransform + curveName
+
+        # cmds.cutKey(outTransform, time=(2, 199), option="keys")
+
+        if not localiseFlag:
+            if ampOrPhase == "Amp":
+                cmds.keyframe(outTransform, time=(2,199), relative=True, valueChange= ranSampVal)
+            if ampOrPhase == "Phase":
+                cmds.keyframe(outTransform, time=(2,199), relative=True, timeChange= ranSampTime)
+
+        else:
+
+            keys = cmds.keyframe(outTransform, time = (2,199), valueChange=True, query=True)
+            times = cmds.keyframe(outTransform, time=(2, 199), timeChange=True, query=True)
+            print keys
+            print times
+
+            cmds.cutKey(outTransform, time=(2, 199), option="keys")
+
+            for keyId, keyVal in enumerate(keys):
+
+                if ampOrPhase == "Amp":
+                    randTime = times[keyId]
+                    randVal = ranSampVal[keyId] * keyVal
+
+
+                if ampOrPhase == "Phase":
+                    randTime = ranSampTime[keyId] * times[keyId]
+                    randVal = keyVal
+
+                    if randTime < 3:
+                        randTime = 3
+
+                    if randTime > 198:
+                        randTime = 198
+
+                cmds.setKeyframe(outTransform, t=(randTime, randTime), v=randVal)
+
+
 
     def flattenDictToVals(self, dicto):
 
@@ -320,6 +479,23 @@ class GUI():
     #
     #     return returnDict
 
+    def cropTreeToStrongestShapes(self):
+
+        startingTree = self.allStartingWeights
+        strongestShapes = self.strongestShapes
+        returnDict = {}
+        for keys, vals in strongestShapes.iteritems():
+            if vals:
+                returnDict[keys] = {}
+                for keys2 in vals:
+                    print keys
+                    print keys2
+                    print keys2[0]
+                    print startingTree[keys][keys2[0]]
+                    returnDict[keys][keys2[0]] = startingTree[keys][keys2[0]]
+
+        return returnDict
+
     def correctSymmetryNames(self, flattened, flattenedSyms):
 
         returnList = []
@@ -345,6 +521,7 @@ class GUI():
                 returnDict[seq] = (vals,symVal)
             else:
                 returnList.append(vals)
+                returnDict[vals] = (vals,vals)
 
         self.symGroups = returnDict
         return returnList
