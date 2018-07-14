@@ -4,6 +4,7 @@ import maya.cmds as cmds
 import random
 from sets import Set
 from functools import partial
+import copy
 
 ##########################################################
 # Plug-in
@@ -32,6 +33,9 @@ class GUI():
         self.originalStrongest = strongestShapes
         self.symGroups = {}
         self.lastElite = self.saveFaceCurves()
+        self.NextGenePool = []
+        self.CurrentGenePool = []
+        self.EliteGenes = []
 
         print "strongestShapes"
         print strongestShapes
@@ -60,7 +64,8 @@ class GUI():
 
 
         self.linearBlendshape(self.strongestShapesTree)
-        self.sampleNonLinear(2)
+        self.EliteGenes = self.saveFaceCurves()
+        self.sampleNonLinear(2,[1,2,3])
 
         import maya.cmds as cmds
         selectionUI = 'altUI'
@@ -86,23 +91,23 @@ class GUI():
         controlGroup = cmds.optionMenu("controlGroup")
         for key in range(1, 4):
             cmds.menuItem(label="SAMPLE " + str(key))
-        cmds.button(label='    Set    ')
+        cmds.button(label='    Set    ', command=partial(self.setFaceAsElite))
         cmds.setParent('..')
 
         cmds.rowLayout(numberOfColumns=2, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'right', 0)])
         cmds.text("                                ")
-        cmds.checkBox(editable=True, label="  Select")
+        cmds.checkBox("face1cB", editable=True, label="  Select")
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=2, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'right', 0)])
         cmds.text("                                ")
-        cmds.checkBox(editable=True, label="  Select")
+        cmds.checkBox("face2cB", editable=True, label="  Select")
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=2, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'right', 0)])
         cmds.text("                                ")
-        cmds.checkBox(editable=True, label="  Select")
+        cmds.checkBox("face3cB", editable=True, label="  Select")
         cmds.setParent('..')
 
         cmds.text(label='')
@@ -113,7 +118,7 @@ class GUI():
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="                 ")
-        cmds.button(label='Reset to Last Elite')
+        cmds.button(label='Reset to Last Elite', command=partial(self.resetToLastElite))
         cmds.text(label="                 ")
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
@@ -125,13 +130,13 @@ class GUI():
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="                 ")
-        cmds.button(label='Add Selected to Gene Pool')
+        cmds.button(label='Add Selected to Gene Pool', command=partial(self.addToGenePool))
         cmds.text(label="                 ")
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="                 ")
-        cmds.button(label='Breed Next Gen')
+        cmds.button(label='Breed Next Gen', command=partial(self.breedNextGen))
         cmds.text(label="                 ")
         cmds.setParent('..')
 
@@ -194,7 +199,7 @@ class GUI():
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="                 ")
-        cmds.button(label='Sample Curve Amplitude', command=partial(self.sampleAmpPhase , "Amp"))
+        cmds.button(label='Sample Curve Amplitude', command=partial(self.sampleAmpPhase , "Amp", [1,2,3]))
         cmds.text(label="                 ")
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
@@ -215,13 +220,13 @@ class GUI():
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="                 ")
-        cmds.button(label='Sample', command=partial(self.sampleNonLinear,-1))
+        cmds.button(label='Sample', command=partial(self.sampleNonLinear,-1, [1,2,3]))
         cmds.text(label="                 ")
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="                 ")
-        cmds.button(label='Sample Curve Phase', command=partial(self.sampleAmpPhase , "Phase"))
+        cmds.button(label='Sample Curve Phase', command=partial(self.sampleAmpPhase , "Phase", [1,2,3]))
         cmds.text(label="                 ")
         cmds.setParent('..')
         cmds.text(label="                 ")
@@ -269,7 +274,7 @@ class GUI():
                 cmds.pasteKey(out2, time=(1, 250), option="replace")
                 cmds.pasteKey(out3, time=(1, 250), option="replace")
 
-    def sampleNonLinear(self, numKeys, *args):
+    def sampleNonLinear(self, numKeys, chosenFaces, *args):
 
         if numKeys < 0:
             numKeys = cmds.intField("numKeys", value=True, query=True)
@@ -288,7 +293,10 @@ class GUI():
         blendshapeTargetTree = self.strongestShapesTree
         blendshapeSourceTree = self.allNeutralWeights
 
-        for sampleFace in range(1,4):
+        print "chosenFaces:"
+        print chosenFaces
+
+        for sampleFace in chosenFaces:
 
             ranSampTime = sorted ( random.sample(range(2, 199), numKeys) , reverse=True)
             ranSampValTemp = [random.random() for _ in range(numKeys)]
@@ -347,7 +355,7 @@ class GUI():
 
             cmds.setKeyframe(outTransform, t=(randTime, randTime), v=sampleVal)
 
-    def sampleAmpPhase(self, ampOrPhase, *args):
+    def sampleAmpPhase(self, ampOrPhase, chosenFaces, *args):
 
 
         localiseFlag = cmds.checkBox("localiseFlag", value=True, query=True)
@@ -359,7 +367,7 @@ class GUI():
         blendshapeTargetTree = self.strongestShapesTree
         blendshapeSourceTree = self.allNeutralWeights
 
-        for sampleFace in range(1,4):
+        for sampleFace in chosenFaces:
 
             if localiseFlag:
                 ranShiftAmp = [random.uniform(1 - sdVal,1 + sdVal) for _ in range(6)]
@@ -552,6 +560,8 @@ class GUI():
                 cmds.copyKey(out1, time=(1, 250), option="keys")  # or keys?
                 cmds.pasteKey(ctlName, time=(1, 250), option="replace")
 
+        self.EliteGenes = self.saveFaceCurves()
+
     def saveFaceCurves(self):
 
         shapeTree = self.strongestShapesTree
@@ -562,6 +572,31 @@ class GUI():
             for ctlName, ctlVal in ctlDict.iteritems():
                 keys = cmds.keyframe(ctlName, time=(1, 250), valueChange=True, query=True)
                 times = cmds.keyframe(ctlName, time=(1, 250), timeChange=True, query=True)
+
+                outGroup[ctlName] = (keys, times)
+            outDict[faceGroup] = outGroup
+
+        return outDict
+
+    def saveFaceCurvesSamples(self, faceId):
+
+        shapeTree = self.strongestShapesTree
+
+        outDict = {}
+        for faceGroup, ctlDict in shapeTree.iteritems():
+            outGroup = {}
+            for ctlName, ctlVal in ctlDict.iteritems():
+
+                nSId = ctlName.find(':')
+                if nSId != -1:
+                    print "in"
+                    out1 = ctlName[:nSId] + str(faceId) + ctlName[nSId:]
+
+                else:
+                    out1 = (self.OTHER_FACE_IDS + ctlName) % faceId
+
+                keys = cmds.keyframe(out1, time=(2, 199), valueChange=True, query=True)
+                times = cmds.keyframe(out1, time=(2, 199), timeChange=True, query=True)
 
                 outGroup[ctlName] = (keys, times)
             outDict[faceGroup] = outGroup
@@ -580,6 +615,226 @@ class GUI():
                     times = ctlVal[1][keyId]
 
                     cmds.setKeyframe(ctlName, t=(times, times), v=keys)
+
+        self.EliteGenes = self.saveFaceCurves()
+
+
+    def addToGenePool(self, *args):
+
+        face1cB = cmds.checkBox("face1cB", value=True, query=True)
+        face2cB = cmds.checkBox("face2cB", value=True, query=True)
+        face3cB = cmds.checkBox("face3cB", value=True, query=True)
+
+        faceToAdd = []
+
+        if face1cB: faceToAdd.append(1)
+        if face2cB: faceToAdd.append(2)
+        if face3cB: faceToAdd.append(3)
+
+        for face in faceToAdd:
+            outDict = self.saveFaceCurvesSamples(face)
+            self.NextGenePool.append(outDict)
+
+        print self.NextGenePool
+
+
+    def breedNextGen(self, *args):
+
+        self.CurrentGenePool = self.NextGenePool
+        self.NextGenePool = []
+
+        self.sampleCurrentGen()
+
+    def sampleCurrentGen(self, *args):
+
+        EliteCurves = self.EliteGenes
+        currentGenePool = self.CurrentGenePool
+
+        lenGenePool = len(currentGenePool)
+
+        for face in range(1,4):
+
+            SAMPLE_FACE = [face]
+            print SAMPLE_FACE
+
+            print "Sampling face: %s" % SAMPLE_FACE
+
+            # Parent handling
+            ELITE_THRESHOLD = 0.5
+
+            eliteCoinFlip = random.random()
+
+            if eliteCoinFlip < ELITE_THRESHOLD:
+                print "Elite"
+                parent1 = EliteCurves
+                parent2 = random.sample(currentGenePool,1)
+                parent2 = parent2[0]
+            else:
+                parent1,parent2 = random.sample(currentGenePool,2)
+
+            print "Parent 1:"
+            print parent1
+            print "Parent 2:"
+            print parent2
+
+            #Curve Group Selection
+
+            ALL_CURVES_THRESHOLD = 0.4
+            GROUP_CURVES_THRESHOLD = 0.8
+            SINGLE_CURVE_THRESHOLD = 1.0
+
+            SWAP_AVG_THRESHOLD = 0.7
+            swapAvgCoinFlip = random.random()
+            if swapAvgCoinFlip < SWAP_AVG_THRESHOLD:
+                breedOperation = "Swap"
+            else:
+                breedOperation = "Avg"
+
+            print "breedOperation: %s" % breedOperation
+
+            whichCurvesCoinFlip = random.random()
+
+            if whichCurvesCoinFlip <= ALL_CURVES_THRESHOLD:
+                curveChoice = "All"
+                bredCurve = self.breedCurves(parent1,parent2,breedOperation,curveChoice)
+            elif whichCurvesCoinFlip <= GROUP_CURVES_THRESHOLD:
+                curveChoice = "Group"
+                bredCurve = self.breedCurves(parent1, parent2, breedOperation, curveChoice)
+            elif whichCurvesCoinFlip <= SINGLE_CURVE_THRESHOLD:
+                curveChoice = "Single"
+                bredCurve = self.breedCurves(parent1, parent2, breedOperation, curveChoice)
+
+            print "curveChoice: %s" % curveChoice
+
+
+            self.setSampleFaceAs(bredCurve, SAMPLE_FACE)
+
+            # Curve Modification
+
+            RESAMPLE_THRESHOLD = 0.2
+            CHANGE_AMP_THRESHOLD = 0.3
+            CHANGE_PHASE_THRESHOLD = 0.4
+            DO_NOTHING_THRESHOLD = 1.0
+
+            whichOperationCoinFlip = random.random()
+
+            if whichOperationCoinFlip <= RESAMPLE_THRESHOLD:
+                operationChoice = "Resample"
+                self.modifyCurves(bredCurve,curveChoice,operationChoice, SAMPLE_FACE)
+            elif whichOperationCoinFlip <= CHANGE_AMP_THRESHOLD:
+                operationChoice = "Amp"
+                self.modifyCurves(bredCurve, curveChoice, operationChoice, SAMPLE_FACE)
+            elif whichOperationCoinFlip <= CHANGE_PHASE_THRESHOLD:
+                operationChoice = "Phase"
+                self.modifyCurves(bredCurve, curveChoice, operationChoice, SAMPLE_FACE)
+            else:
+                operationChoice = "Nothing"
+
+            print "operationChoice: %s" % operationChoice
+
+    def breedCurves(self,parent1,parent2,breedOperation,curveChoice):
+
+        outCurves = copy.deepcopy(parent1)
+        print outCurves
+
+        if curveChoice == "Single":
+            curveSelection = random.choice(self.symGroups.keys())
+            groupSelection = "All"
+        elif curveChoice == "Group":
+            groupSelection = random.choice(self.strongestShapesTree.keys())
+            curveSelection = "All"
+        else:
+            curveSelection = "All"
+            groupSelection = "All"
+
+        for faceGroup, ctlDict in parent1.iteritems():
+
+            if faceGroup == groupSelection and groupSelection == "All":
+                print "Swapping Groups"
+                outCurves[faceGroup] = parent2[faceGroup]
+            elif curveSelection != "All":
+
+                for ctlName, ctlVal in ctlDict.iteritems():
+
+                    if self.symGroups[curveSelection][0] == ctlName:
+                        print "Swapping curve: %s" % ctlName
+                        outCurves[faceGroup][ctlName] = parent2[faceGroup][ctlName]
+                        outCurves[faceGroup][self.symGroups[curveSelection][1]] = parent2[faceGroup][self.symGroups[curveSelection][1]]
+            else:
+                for ctlName, ctlVal in ctlDict.iteritems():
+
+                    if breedOperation == "Swap":
+                        coinFlip = random.random()
+                        if coinFlip < 0.5:
+                            print "Swapping All Curves"
+                            outCurves[faceGroup][ctlName] = parent2[faceGroup][ctlName]
+                            outCurves[faceGroup][self.allSymmetryNames[faceGroup][ctlName]] = parent2[faceGroup][self.allSymmetryNames[faceGroup][ctlName]]
+
+                    else:
+                        for keyId, keys in enumerate(ctlVal[0]):
+
+                            print "Averaging curves"
+
+                            outCurves[faceGroup][ctlName][0][keyId] = (keys + parent2[faceGroup][ctlName][0][keyId]) / 2
+                            outCurves[faceGroup][ctlName][1][keyId] = (parent1[faceGroup][ctlName][1][keyId] + parent2[faceGroup][ctlName][1][keyId]) / 2
+                            outCurves[faceGroup][self.allSymmetryNames[faceGroup][ctlName]][0][keyId] = (keys
+                                                                                              + parent2[faceGroup][self.allSymmetryNames[faceGroup][ctlName]][0][keyId]) / 2
+                            outCurves[faceGroup][self.allSymmetryNames[faceGroup][ctlName]][1][keyId] = (parent2[faceGroup][ctlName][1][keyId]
+                                                                                              + parent2[faceGroup][self.allSymmetryNames[faceGroup][ctlName]][1][keyId]) / 2
+
+        return outCurves
+
+    def modifyCurves(self, bredCurve, curveChoice, operationChoice, SAMPLE_FACE):
+        if curveChoice == "Single":
+            curveSelection = random.choice(self.symGroups.keys())
+            groupSelection = "All"
+        elif curveChoice == "Group":
+            groupSelection = random.choice(self.strongestShapesTree.keys())
+            curveSelection = "All"
+        else:
+            curveSelection = "All"
+            groupSelection = "All"
+
+        print "Group: %s, Curve: %s" % (groupSelection, curveSelection)
+        cmds.optionMenu("controlGroupSourceGroup", edit=True, value = groupSelection)
+        cmds.optionMenu("controlGroupSource", edit=True, value=curveSelection)
+
+        if operationChoice == "Resample":
+            print SAMPLE_FACE
+            self.sampleNonLinear(operationChoice, 2, SAMPLE_FACE)
+        elif operationChoice == "Amp" or operationChoice == "Phase":
+            self.sampleAmpPhase(operationChoice,SAMPLE_FACE)
+
+
+    def setSampleFaceAs(self, bredCurve, SAMPLE_FACE):
+
+        print "Setting Sample Face:"
+        for faceGroup, ctlDict in bredCurve.iteritems():
+            outGroup = {}
+            for ctlName, ctlVal in ctlDict.iteritems():
+
+                nSId = ctlName.find(':')
+                if nSId != -1:
+                    print "in"
+                    out1 = ctlName[:nSId] + str(SAMPLE_FACE[0]) + ctlName[nSId:]
+
+                else:
+                    out1 = (self.OTHER_FACE_IDS + ctlName) % SAMPLE_FACE[0]
+
+                cmds.cutKey(out1, time=(2, 199), option="keys")
+
+                for keyId, keys in enumerate(ctlVal[0]):
+                    times = ctlVal[1][keyId]
+
+                    print "Face: %s, Time: %d, Val: %d" % (out1, times, keys)
+
+                    cmds.setKeyframe(out1, t=(times, times), v=keys)
+
+
+
+
+
+
 
 
 
