@@ -124,7 +124,7 @@ class GUI():
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="                 ")
-        cmds.button(label='Sample Current Gen')
+        cmds.button(label='Sample Current Gen', command=partial(self.sampleNonLinear,2, [1,2,3]))
         cmds.text(label="                 ")
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
@@ -647,6 +647,10 @@ class GUI():
 
     def sampleCurrentGen(self, *args):
 
+        if not self.CurrentGenePool:
+            print "Resampling with Empty Gene Pool"
+            self.sampleNonLinear(2,[1,2,3])
+
         EliteCurves = self.EliteGenes
         currentGenePool = self.CurrentGenePool
 
@@ -706,6 +710,9 @@ class GUI():
 
             print "curveChoice: %s" % curveChoice
 
+            print "bredCurve:"
+            print bredCurve
+
 
             self.setSampleFaceAs(bredCurve, SAMPLE_FACE)
 
@@ -749,9 +756,10 @@ class GUI():
 
         for faceGroup, ctlDict in parent1.iteritems():
 
-            if faceGroup == groupSelection and groupSelection == "All":
-                print "Swapping Groups"
-                outCurves[faceGroup] = parent2[faceGroup]
+            if curveChoice == "Group":
+                if (faceGroup == groupSelection) and (curveSelection == "All"):
+                    print "Swapping Groups: %s" % faceGroup
+                    outCurves[faceGroup] = parent2[faceGroup]
             elif curveSelection != "All":
 
                 for ctlName, ctlVal in ctlDict.iteritems():
@@ -784,7 +792,7 @@ class GUI():
 
         return outCurves
 
-    def modifyCurves(self, bredCurve, curveChoice, operationChoice, SAMPLE_FACE):
+    def modifyCurves(self, bredCurve, curveChoice, operationChoice, sf):
         if curveChoice == "Single":
             curveSelection = random.choice(self.symGroups.keys())
             groupSelection = "All"
@@ -800,10 +808,10 @@ class GUI():
         cmds.optionMenu("controlGroupSource", edit=True, value=curveSelection)
 
         if operationChoice == "Resample":
-            print SAMPLE_FACE
-            self.sampleNonLinear(operationChoice, 2, SAMPLE_FACE)
+            print sf
+            self.sampleNonLinear(2, sf)
         elif operationChoice == "Amp" or operationChoice == "Phase":
-            self.sampleAmpPhase(operationChoice,SAMPLE_FACE)
+            self.sampleAmpPhase(operationChoice,sf)
 
 
     def setSampleFaceAs(self, bredCurve, SAMPLE_FACE):
@@ -826,7 +834,7 @@ class GUI():
                 for keyId, keys in enumerate(ctlVal[0]):
                     times = ctlVal[1][keyId]
 
-                    print "Face: %s, Time: %d, Val: %d" % (out1, times, keys)
+                    print "Face: %s, Time: %f, Val: %f" % (out1, times, keys)
 
                     cmds.setKeyframe(out1, t=(times, times), v=keys)
 
