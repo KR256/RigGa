@@ -72,7 +72,7 @@ class GUI():
         self.copyEliteToSamples(self.strongestShapesTree)
         self.EliteGenes = self.saveFaceCurves()
 
-        self.resampleCurvesNoise(0.005, 5,  [1,2,3])
+        self.resampleCurvesNoise(0.01, 5,  [1,2,3])
 
         selectionUI = 'altUI'
 
@@ -328,15 +328,24 @@ class GUI():
             outTransform = outTransform + curveName
 
         cmds.cutKey(outTransform, time=(2, 199), option="keys")
+        cmds.copyKey(curveName, time=(1, 250), option="keys")  # or keys?
+        cmds.pasteKey(outTransform, time=(1, 250), option="replace")
 
         for frame in range(startTime + 1, endTime - 1, samplingStep):
 
             cmds.setKeyframe(outTransform, t=(frame, frame), insert=True)
 
-        for frame in range(startTime + 1, endTime - 1, samplingStep):
+        for frame in range(startTime + samplingStep+1, endTime - samplingStep-1, samplingStep):
             currentVal = cmds.keyframe(outTransform, time=(frame, frame), valueChange=True, query=True)
+            prevVal = cmds.keyframe(outTransform, time=(frame - samplingStep, frame - samplingStep), valueChange=True, query=True)
+            nextVal = cmds.keyframe(outTransform, time=(frame + samplingStep, frame + samplingStep), valueChange=True, query=True)
             print currentVal
-            mutatedVal = random.gauss(currentVal[0], mutateSD)
+            if ( abs(nextVal[0] - currentVal[0]) < 0.001 ):
+            	print "Big Random"
+            	mutatedVal = random.gauss(currentVal[0], mutateSD)
+            else:
+            	mutatedVal = random.uniform(prevVal[0], nextVal[0])
+            	mutatedVal = (mutatedVal + currentVal[0]) / 2
             print mutatedVal
             cmds.setKeyframe(outTransform, t=(frame, frame), v=mutatedVal)
 
