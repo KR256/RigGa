@@ -12,7 +12,7 @@ import copy
 class GUI():
 
     def __init__(self, CTL_TREE,allStartingWeights,allNeutralWeights,
-                 allCurrentGenWeights, strongestShapes, minMaxWeights, allSymmetryNames,OTHER_FACE_IDS):
+                 allCurrentGenWeights, strongestShapes, minMaxWeights, allSymmetryNames,OTHER_FACE_IDS, NOISE_OR_DENOISE):
 
         self.ctlTree = CTL_TREE
         self.allStartingWeights = allStartingWeights
@@ -36,6 +36,10 @@ class GUI():
         self.NextGenePool = []
         self.CurrentGenePool = []
         self.EliteGenes = []
+        self.NOISE_OR_DENOISE = NOISE_OR_DENOISE
+
+        self.minSliderTime = int(cmds.playbackOptions(minTime=True, query=True))
+        self.maxSliderTime = int(cmds.playbackOptions(maxTime=True, query=True))
 
         print "strongestShapes"
         print strongestShapes
@@ -62,10 +66,13 @@ class GUI():
 
         newShapesSym = self.correctSymmetryNames(newShapes, flattenedSyms)
 
+        # if self.NOISE_OR_DENOISE == "NOISE":
+        #     self.initElite(self.strongestShapesTree, 5)
 
-        self.linearBlendshape(self.strongestShapesTree)
+        self.copyEliteToSamples(self.strongestShapesTree)
         self.EliteGenes = self.saveFaceCurves()
-        self.sampleNonLinear(2,[1,2,3])
+
+        self.resampleCurvesNoise(0.005, 5,  [1,2,3])
 
         selectionUI = 'altUI'
 
@@ -191,8 +198,8 @@ class GUI():
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
-        cmds.text(label="                 Number of New Keys:")
-        cmds.intField("numKeys",minValue=1, maxValue=4, value=2, editable=True)
+        cmds.text(label="                 Sample Step:")
+        cmds.intField("sampleStep",minValue=1, maxValue=1000, value=5, editable=True)
         cmds.text(label="                ")
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
@@ -205,8 +212,8 @@ class GUI():
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)], w=100)
 
         cmds.text(label='                S.D: ')
-        cmds.floatSliderGrp("sdVal", field=True, minValue=0.0, maxValue=1.0, fieldMinValue=0.0,
-                            fieldMaxValue=1.0, value=0.3, cw=[(1, 50), (2, 120)])
+        cmds.floatSliderGrp("sdVal", field=True, minValue=0.0, maxValue=0.5, fieldMinValue=0.0,
+                            fieldMaxValue=0.5, value=0.2, cw=[(1, 50), (2, 120)])
         cmds.text(label='                   ')
         cmds.setParent('..')
 
@@ -219,7 +226,7 @@ class GUI():
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="                 ")
-        cmds.button(label='Sample', command=partial(self.sampleNonLinear,-1, [1,2,3]))
+        cmds.button(label='Sample', command=partial(self.resampleCurvesNoise,-1, [1,2,3]))
         cmds.text(label="                 ")
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
@@ -237,16 +244,18 @@ class GUI():
 
         cmds.showWindow()
 
-    def linearBlendshape(self, blendshapeTargetTree):
+    # def initElite(self, blendshapeTargetTree, samplingStep):
+    #
+    #     startTime = self.minSliderTime
+    #     endTime = self.maxSliderTime
+    #     for faceGroup, ctlDict in blendshapeTargetTree.iteritems():
+    #
+    #         for ctlName, ctlVal in ctlDict.iteritems():
+    #
+    #             for frame in range(startTime,endTime,samplingStep):
+    #
+    #                 cmds.setKeyframe(ctlName, t=(frame, frame), insert=True)
 
-        for faceGroup, ctlDict in blendshapeTargetTree.iteritems():
-
-            for ctlName, ctlVal in ctlDict.iteritems():
-
-                cmds.setKeyframe(ctlName, t=(250, 250), v=ctlVal)
-                cmds.setKeyframe(ctlName, t=(200, 200), v=ctlVal)
-
-        self.copyEliteToSamples(self.strongestShapesTree)
 
     def copyEliteToSamples(self, blendshapeTargetTree, *args):
 
@@ -273,10 +282,10 @@ class GUI():
                 cmds.pasteKey(out2, time=(1, 250), option="replace")
                 cmds.pasteKey(out3, time=(1, 250), option="replace")
 
-    def sampleNonLinear(self, numKeys, chosenFaces, *args):
+    def resampleCurvesNoise(self, MUTATION_VAL, SAMPLE_STEP, chosenFaces, *args):
 
-        if numKeys < 0:
-            numKeys = cmds.intField("numKeys", value=True, query=True)
+        if MUTATION_VAL < 0:
+            SAMPLE_STEP = cmds.intField("sampleStep", value=True, query=True)
             localiseFlag = cmds.checkBox("localiseFlag", value=True, query=True)
             selectedGroup = cmds.optionMenu("controlGroupSourceGroup", value=True, query=True)
             selectedCurve = cmds.optionMenu("controlGroupSource", value=True, query=True)
@@ -297,41 +306,19 @@ class GUI():
 
         for sampleFace in chosenFaces:
 
-            ranSampTime = sorted ( random.sample(range(2, 199), numKeys) , reverse=True)
-            ranSampValTemp = [random.random() for _ in range(numKeys)]
-            print ranSampValTemp
-            ranSampVal = sorted(ranSampValTemp,reverse=True)
-            print ranSampVal
-            print ranSampTime
-
             for faceGroup, ctlDict in blendshapeTargetTree.iteritems():
 
-                if  selectedGroup == faceGroup:
-                    print "Selected Group True"
-                    ranSampTime = sorted(random.sample(range(2, 199), numKeys) , reverse=True)
-                    ranSampValTemp = [random.random() for _ in range(numKeys)]
-                    ranSampVal = sorted(ranSampValTemp,reverse=True)
+                for ctlName, ctlVal in ctlDict.iteritems():
 
-                if selectedGroup == faceGroup or selectedGroup == 'All':
-                    for ctlName, ctlVal in ctlDict.iteritems():
-
-                        if selectedCurve != 'All':
-                            if self.symGroups[selectedCurve][0] == ctlName:
-                                print "Selected Curve True"
-                                ranSampTime2 = sorted(random.sample(range(2,199), numKeys) , reverse=True)
-                                ranSampValTemp2= [random.random() for _ in range(numKeys)]
-                                ranSampVal2 = sorted(ranSampValTemp2,reverse=True)
-
-                                self.individualCurveSample(ctlName, faceGroup, ranSampTime2, ranSampVal2, ctlVal,
-                                                           sampleFace)
-                                self.individualCurveSample(self.symGroups[selectedCurve][1], faceGroup, ranSampTime2, ranSampVal2, ctlVal,
-                                                           sampleFace)
-                        else:
-                            self.individualCurveSample(ctlName, faceGroup, ranSampTime, ranSampVal, ctlVal, sampleFace)
+                    self.individualCurveSample(ctlName, faceGroup, MUTATION_VAL, SAMPLE_STEP, sampleFace)
 
 
 
-    def individualCurveSample(self, curveName, faceGroup, ranSampTime, ranSampVal, ctlVal, sampleFace):
+    def individualCurveSample(self, curveName, faceGroup, mutateSD, samplingStep, sampleFace):
+
+        print "Entered Ind Sample"
+        startTime = self.minSliderTime
+        endTime = self.maxSliderTime
 
         nSId = curveName.find(':')
         if nSId != -1:
@@ -342,17 +329,16 @@ class GUI():
 
         cmds.cutKey(outTransform, time=(2, 199), option="keys")
 
+        for frame in range(startTime + 1, endTime - 1, samplingStep):
 
-        for keyId,ranKey in enumerate(ranSampVal):
+            cmds.setKeyframe(outTransform, t=(frame, frame), insert=True)
 
-            randTime = ranSampTime[keyId]
-
-            neutralVal = self.allNeutralWeights[faceGroup][curveName]
-            sampleVal = neutralVal + (ranKey * (ctlVal - neutralVal))
-
-
-
-            cmds.setKeyframe(outTransform, t=(randTime, randTime), v=sampleVal)
+        for frame in range(startTime + 1, endTime - 1, samplingStep):
+            currentVal = cmds.keyframe(outTransform, time=(frame, frame), valueChange=True, query=True)
+            print currentVal
+            mutatedVal = random.gauss(currentVal[0], mutateSD)
+            print mutatedVal
+            cmds.setKeyframe(outTransform, t=(frame, frame), v=mutatedVal)
 
     def sampleAmpPhase(self, ampOrPhase, chosenFaces, *args):
 
