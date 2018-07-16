@@ -124,7 +124,7 @@ class GUI():
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="                 ")
-        cmds.button(label='Sample Current Gen', command=partial(self.sampleNonLinear,2, [1,2,3]))
+        cmds.button(label='Sample Current Gen', command=partial(self.sampleCurrentGen))
         cmds.text(label="                 ")
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
@@ -651,93 +651,94 @@ class GUI():
             print "Resampling with Empty Gene Pool"
             self.sampleNonLinear(2,[1,2,3])
 
-        EliteCurves = self.EliteGenes
-        currentGenePool = self.CurrentGenePool
+        else:
+            EliteCurves = self.EliteGenes
+            currentGenePool = self.CurrentGenePool
 
-        lenGenePool = len(currentGenePool)
+            lenGenePool = len(currentGenePool)
 
-        for face in range(1,4):
+            for face in range(1,4):
 
-            SAMPLE_FACE = [face]
-            print SAMPLE_FACE
+                SAMPLE_FACE = [face]
+                print SAMPLE_FACE
 
-            print "Sampling face: %s" % SAMPLE_FACE
+                print "Sampling face: %s" % SAMPLE_FACE
 
-            # Parent handling
-            ELITE_THRESHOLD = 0.5
+                # Parent handling
+                ELITE_THRESHOLD = 0.5
 
-            eliteCoinFlip = random.random()
+                eliteCoinFlip = random.random()
 
-            if eliteCoinFlip < ELITE_THRESHOLD:
-                print "Elite"
-                parent1 = EliteCurves
-                parent2 = random.sample(currentGenePool,1)
-                parent2 = parent2[0]
-            else:
-                parent1,parent2 = random.sample(currentGenePool,2)
+                if eliteCoinFlip < ELITE_THRESHOLD:
+                    print "Elite"
+                    parent1 = EliteCurves
+                    parent2 = random.sample(currentGenePool,1)
+                    parent2 = parent2[0]
+                else:
+                    parent1,parent2 = random.sample(currentGenePool,2)
 
-            print "Parent 1:"
-            print parent1
-            print "Parent 2:"
-            print parent2
+                print "Parent 1:"
+                print parent1
+                print "Parent 2:"
+                print parent2
 
-            #Curve Group Selection
+                #Curve Group Selection
 
-            ALL_CURVES_THRESHOLD = 0.4
-            GROUP_CURVES_THRESHOLD = 0.8
-            SINGLE_CURVE_THRESHOLD = 1.0
+                ALL_CURVES_THRESHOLD = 0.4
+                GROUP_CURVES_THRESHOLD = 0.8
+                SINGLE_CURVE_THRESHOLD = 1.0
 
-            SWAP_AVG_THRESHOLD = 0.7
-            swapAvgCoinFlip = random.random()
-            if swapAvgCoinFlip < SWAP_AVG_THRESHOLD:
-                breedOperation = "Swap"
-            else:
-                breedOperation = "Avg"
+                SWAP_AVG_THRESHOLD = 0.7
+                swapAvgCoinFlip = random.random()
+                if swapAvgCoinFlip < SWAP_AVG_THRESHOLD:
+                    breedOperation = "Swap"
+                else:
+                    breedOperation = "Avg"
 
-            print "breedOperation: %s" % breedOperation
+                print "breedOperation: %s" % breedOperation
 
-            whichCurvesCoinFlip = random.random()
+                whichCurvesCoinFlip = random.random()
 
-            if whichCurvesCoinFlip <= ALL_CURVES_THRESHOLD:
-                curveChoice = "All"
-                bredCurve = self.breedCurves(parent1,parent2,breedOperation,curveChoice)
-            elif whichCurvesCoinFlip <= GROUP_CURVES_THRESHOLD:
-                curveChoice = "Group"
-                bredCurve = self.breedCurves(parent1, parent2, breedOperation, curveChoice)
-            elif whichCurvesCoinFlip <= SINGLE_CURVE_THRESHOLD:
-                curveChoice = "Single"
-                bredCurve = self.breedCurves(parent1, parent2, breedOperation, curveChoice)
+                if whichCurvesCoinFlip <= ALL_CURVES_THRESHOLD:
+                    curveChoice = "All"
+                    bredCurve = self.breedCurves(parent1,parent2,breedOperation,curveChoice)
+                elif whichCurvesCoinFlip <= GROUP_CURVES_THRESHOLD:
+                    curveChoice = "Group"
+                    bredCurve = self.breedCurves(parent1, parent2, breedOperation, curveChoice)
+                elif whichCurvesCoinFlip <= SINGLE_CURVE_THRESHOLD:
+                    curveChoice = "Single"
+                    bredCurve = self.breedCurves(parent1, parent2, breedOperation, curveChoice)
 
-            print "curveChoice: %s" % curveChoice
+                print "curveChoice: %s" % curveChoice
 
-            print "bredCurve:"
-            print bredCurve
+                print "bredCurve:"
+                print bredCurve
 
 
-            self.setSampleFaceAs(bredCurve, SAMPLE_FACE)
+                self.setSampleFaceAs(bredCurve, SAMPLE_FACE)
 
-            # Curve Modification
+                # Curve Modification
 
-            RESAMPLE_THRESHOLD = 0.2
-            CHANGE_AMP_THRESHOLD = 0.3
-            CHANGE_PHASE_THRESHOLD = 0.4
-            DO_NOTHING_THRESHOLD = 1.0
+                RESAMPLE_THRESHOLD = 0.2
+                CHANGE_AMP_THRESHOLD = 0.3
+                CHANGE_PHASE_THRESHOLD = 0.4
+                DO_NOTHING_THRESHOLD = 1.0
 
-            whichOperationCoinFlip = random.random()
+                whichOperationCoinFlip = random.random()
 
-            if whichOperationCoinFlip <= RESAMPLE_THRESHOLD:
-                operationChoice = "Resample"
-                self.modifyCurves(bredCurve,curveChoice,operationChoice, SAMPLE_FACE)
-            elif whichOperationCoinFlip <= CHANGE_AMP_THRESHOLD:
-                operationChoice = "Amp"
-                self.modifyCurves(bredCurve, curveChoice, operationChoice, SAMPLE_FACE)
-            elif whichOperationCoinFlip <= CHANGE_PHASE_THRESHOLD:
-                operationChoice = "Phase"
-                self.modifyCurves(bredCurve, curveChoice, operationChoice, SAMPLE_FACE)
-            else:
-                operationChoice = "Nothing"
+                if whichOperationCoinFlip <= RESAMPLE_THRESHOLD:
+                    operationChoice = "Resample"
+                    self.modifyCurves(bredCurve,curveChoice,operationChoice, SAMPLE_FACE)
+                elif whichOperationCoinFlip <= CHANGE_AMP_THRESHOLD:
+                    operationChoice = "Amp"
+                    self.modifyCurves(bredCurve, curveChoice, operationChoice, SAMPLE_FACE)
+                elif whichOperationCoinFlip <= CHANGE_PHASE_THRESHOLD:
+                    operationChoice = "Phase"
+                    self.modifyCurves(bredCurve, curveChoice, operationChoice, SAMPLE_FACE)
+                else:
+                    operationChoice = "Nothing"
 
-            print "operationChoice: %s" % operationChoice
+                print "operationChoice: %s" % operationChoice
 
     def breedCurves(self,parent1,parent2,breedOperation,curveChoice):
 
