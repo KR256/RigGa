@@ -72,7 +72,10 @@ class GUI():
         self.copyEliteToSamples(self.strongestShapesTree)
         self.EliteGenes = self.saveFaceCurves()
 
-        self.resampleCurvesNoise(0.01, 5,  [1,2,3])
+        if self.NOISE_OR_DENOISE == "NOISE":
+            self.resampleCurvesNoise(1, [1,2,3])
+        elif self.NOISE_OR_DENOISE == "DENOISE":
+            self.resampleCurvesDenoise(1, [1,2,3])
 
         selectionUI = 'altUI'
 
@@ -182,12 +185,12 @@ class GUI():
             cmds.menuItem(label="SAMPLE " + str(key))
         cmds.button(label='    Set    ', command=partial(self.setFaceAsElite))
         cmds.setParent('..')
-        cmds.text("New Curves:", font="boldLabelFont", al="center")
-        cmds.text("Modify Curves:", font="boldLabelFont", al="center")
+        cmds.text("Resample Timestep:", font="boldLabelFont", al="center")
+        cmds.text("Resample Noise:", font="boldLabelFont", al="center")
         cmds.rowLayout(numberOfColumns=2, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'right', 0)])
         cmds.text("                                ")
-        cmds.checkBox("localiseFlag",editable=True, label="  Localise sampling")
+        cmds.text(label="                                ")
         cmds.setParent('..')
 
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
@@ -198,22 +201,31 @@ class GUI():
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
-        cmds.text(label="                 Sample Step:")
-        cmds.intField("sampleStep",minValue=1, maxValue=1000, value=5, editable=True)
+        if self.NOISE_OR_DENOISE == "NOISE":
+            cmds.text(label="                 Sample Step:")
+            cmds.intField("sampleStep", minValue=1, maxValue=1000, value=5, editable=True)
+        elif self.NOISE_OR_DENOISE == "DENOISE":
+            cmds.text(label="            Time Tolerance:")
+            cmds.floatField("timeTol", minValue=0.0, maxValue=1.0, value=0.5, editable=True)
         cmds.text(label="                ")
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
-                       columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
-        cmds.text(label="                 ")
-        cmds.button(label='Sample Curve Amplitude', command=partial(self.sampleAmpPhase , "Amp", [1,2,3]))
-        cmds.text(label="                 ")
+                       columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)], w=100)
+        if self.NOISE_OR_DENOISE == "NOISE":
+            cmds.text(label='                S.D: ')
+            cmds.floatSliderGrp("sdVal", field=True, minValue=0.0, maxValue=0.01, fieldMinValue=0.0,
+                            fieldMaxValue=0.01, value=0.01, cw=[(1, 50), (2, 120)])
+        elif self.NOISE_OR_DENOISE == "DENOISE":
+            cmds.text(label="           Val Tolerance:")
+            cmds.floatField("valTol", minValue=0.0, maxValue=0.1, value=0.01, editable=True)
+        cmds.text(label='                   ')
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)], w=100)
 
-        cmds.text(label='                S.D: ')
-        cmds.floatSliderGrp("sdVal", field=True, minValue=0.0, maxValue=0.5, fieldMinValue=0.0,
-                            fieldMaxValue=0.5, value=0.2, cw=[(1, 50), (2, 120)])
+        cmds.text(label='                Threshold: ')
+        cmds.floatSliderGrp("sdThreshold", field=True, minValue=0.0, maxValue=0.003, fieldMinValue=0.0,
+                            fieldMaxValue=0.003, value=0.001, cw=[(1, 50), (2, 120)])
         cmds.text(label='                   ')
         cmds.setParent('..')
 
@@ -226,13 +238,16 @@ class GUI():
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="                 ")
-        cmds.button(label='Sample', command=partial(self.resampleCurvesNoise,-1, [1,2,3]))
+        cmds.text(label="                 ")
         cmds.text(label="                 ")
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="                 ")
-        cmds.button(label='Sample Curve Phase', command=partial(self.sampleAmpPhase , "Phase", [1,2,3]))
+        if self.NOISE_OR_DENOISE == "NOISE":
+            cmds.button(label='Sample', command=partial(self.resampleCurvesNoise,-1, [1,2,3]))
+        else:
+            cmds.button(label='Sample', command=partial(self.resampleCurvesDenoise, -1, [1, 2, 3]))
         cmds.text(label="                 ")
         cmds.setParent('..')
         cmds.text(label="                 ")
@@ -282,17 +297,9 @@ class GUI():
                 cmds.pasteKey(out2, time=(1, 250), option="replace")
                 cmds.pasteKey(out3, time=(1, 250), option="replace")
 
-    def resampleCurvesNoise(self, MUTATION_VAL, SAMPLE_STEP, chosenFaces, *args):
+    def resampleCurvesNoise(self, FLAG, chosenFaces, *args):
 
-        if MUTATION_VAL < 0:
-            SAMPLE_STEP = cmds.intField("sampleStep", value=True, query=True)
-            localiseFlag = cmds.checkBox("localiseFlag", value=True, query=True)
-            selectedGroup = cmds.optionMenu("controlGroupSourceGroup", value=True, query=True)
-            selectedCurve = cmds.optionMenu("controlGroupSource", value=True, query=True)
 
-        else:
-            selectedGroup = 'All'
-            selectedCurve = 'All'
 
         # if localiseFlag:
         #     self.copyEliteToSamples(self.allStartingWeights)
@@ -306,15 +313,32 @@ class GUI():
 
         for sampleFace in chosenFaces:
 
+            if FLAG < 0:
+                SAMPLE_STEP = cmds.intField("sampleStep", value=True, query=True)
+                MUTATION_VAL = cmds.floatSliderGrp("sdVal", value=True, query=True)
+                MUTATION_THRESHOLD = cmds.floatSliderGrp("sdThreshold", value=True, query=True)
+                selectedGroup = cmds.optionMenu("controlGroupSourceGroup", value=True, query=True)
+                selectedCurve = cmds.optionMenu("controlGroupSource", value=True, query=True)
+
+            else:
+                SAMPLE_STEP = random.choice([random.randint(1, 5), random.randrange(5, 25, 5)])
+                MUTATION_VAL = random.uniform(0.00, 0.01)
+                MUTATION_THRESHOLD = random.uniform(0.000, 0.002)
+                selectedGroup = 'All'
+                selectedCurve = 'All'
+
+
+            print "Sample Step %i, Mutate Val %f, Mutate Threshold %f" % (SAMPLE_STEP, MUTATION_VAL, MUTATION_THRESHOLD)
+
             for faceGroup, ctlDict in blendshapeTargetTree.iteritems():
 
                 for ctlName, ctlVal in ctlDict.iteritems():
 
-                    self.individualCurveSample(ctlName, faceGroup, MUTATION_VAL, SAMPLE_STEP, sampleFace)
+                    self.individualCurveSample(ctlName, faceGroup, MUTATION_VAL, SAMPLE_STEP, MUTATION_THRESHOLD, sampleFace)
 
 
 
-    def individualCurveSample(self, curveName, faceGroup, mutateSD, samplingStep, sampleFace):
+    def individualCurveSample(self, curveName, faceGroup, mutateSD, samplingStep, MUTATION_THRESHOLD, sampleFace):
 
         print "Entered Ind Sample"
         startTime = self.minSliderTime
@@ -340,70 +364,64 @@ class GUI():
             prevVal = cmds.keyframe(outTransform, time=(frame - samplingStep, frame - samplingStep), valueChange=True, query=True)
             nextVal = cmds.keyframe(outTransform, time=(frame + samplingStep, frame + samplingStep), valueChange=True, query=True)
             print currentVal
-            if ( abs(nextVal[0] - currentVal[0]) < 0.001 ):
-            	print "Big Random"
-            	mutatedVal = random.gauss(currentVal[0], mutateSD)
+            if ( abs(nextVal[0] - currentVal[0]) < MUTATION_THRESHOLD ):
+                print "Big Random"
+                mutatedVal = random.gauss(currentVal[0], mutateSD)
             else:
-            	mutatedVal = random.uniform(prevVal[0], nextVal[0])
-            	mutatedVal = (mutatedVal + currentVal[0]) / 2
-            print mutatedVal
+                mutateOrNot = random.uniform(0.0, 1.0)
+                if mutateOrNot <= 0.5:
+                    mutatedVal = random.uniform(prevVal[0], nextVal[0])
+                    mutatedVal = (mutatedVal + currentVal[0]) / 2
+                else:
+                    mutatedVal = currentVal[0]
+            print "Current Val %f -> Mutated: %f" % (currentVal[0],mutatedVal)
             cmds.setKeyframe(outTransform, t=(frame, frame), v=mutatedVal)
 
-    def sampleAmpPhase(self, ampOrPhase, chosenFaces, *args):
+
+    def resampleCurvesDenoise(self, FLAG, chosenFaces, *args):
 
 
-        localiseFlag = cmds.checkBox("localiseFlag", value=True, query=True)
-        selectedGroup = cmds.optionMenu("controlGroupSourceGroup", value=True, query=True)
-        selectedCurve = cmds.optionMenu("controlGroupSource", value=True, query=True)
-        sdVal = cmds.floatSliderGrp("sdVal", value=True, query=True)
 
+        # if localiseFlag:
+        #     self.copyEliteToSamples(self.allStartingWeights)
+        # else:
 
         blendshapeTargetTree = self.strongestShapesTree
         blendshapeSourceTree = self.allNeutralWeights
 
+        print "chosenFaces:"
+        print chosenFaces
+
         for sampleFace in chosenFaces:
 
-            if localiseFlag:
-                ranShiftAmp = [random.uniform(1 - sdVal,1 + sdVal) for _ in range(6)]
-                ranShiftPhase = [random.uniform(1 - sdVal,1 + sdVal) for _ in range(6)]
+            if FLAG < 0:
+                TIME_VAL = cmds.floatField("timeTol", value=True, query=True)
+                THRESHOLD_VAL = cmds.floatField("valTol", value=True, query=True)
+                selectedGroup = cmds.optionMenu("controlGroupSourceGroup", value=True, query=True)
+                selectedCurve = cmds.optionMenu("controlGroupSource", value=True, query=True)
+
             else:
-                ranShiftAmp = random.uniform(-0.3,0.3)
-                ranShiftPhase = random.uniform(-20, 20)
+                TIME_VAL = random.uniform(0.00, 0.8)
+                THRESHOLD_VAL = random.uniform(0.000, 0.05)
+                selectedGroup = 'All'
+                selectedCurve = 'All'
+
+
+            print "TIME_VAL %f, THRESHOLD_VAL %f" % (TIME_VAL, THRESHOLD_VAL)
 
             for faceGroup, ctlDict in blendshapeTargetTree.iteritems():
 
-                if  selectedGroup == faceGroup:
-                    print "Selected Group True"
-                    if localiseFlag:
-                        ranShiftAmp = [random.uniform(1 - sdVal, 1 + sdVal) for _ in range(6)]
-                        ranShiftPhase = [random.uniform(1 - sdVal, 1 + sdVal) for _ in range(6)]
-                    else:
-                        ranShiftAmp = random.uniform(-0.3, 0.3)
-                        ranShiftPhase = random.uniform(-20, 20)
+                for ctlName, ctlVal in ctlDict.iteritems():
 
-                if selectedGroup == faceGroup or selectedGroup == 'All':
-                    for ctlName, ctlVal in ctlDict.iteritems():
+                    self.individualCurveDenoise(ctlName, faceGroup, TIME_VAL, THRESHOLD_VAL, sampleFace)
 
-                        if selectedCurve != 'All':
-                            if self.symGroups[selectedCurve][0] == ctlName:
-                                print "Selected Curve True"
-                                if localiseFlag:
-                                    ranShiftAmp2 = [random.uniform(1 - sdVal, 1 + sdVal) for _ in range(6)]
-                                    ranShiftPhase2 = [random.uniform(1 - sdVal, 1 + sdVal) for _ in range(6)]
-                                else:
-                                    ranShiftAmp2 = random.uniform(-0.3, 0.3)
-                                    ranShiftPhase2 = random.uniform(-20, 20)
 
-                                self.individualCurveAmpPhaseSample(ctlName, faceGroup, ranShiftPhase2, ranShiftAmp2, ctlVal,
-                                                           sampleFace, localiseFlag, ampOrPhase)
-                                self.individualCurveAmpPhaseSample(self.symGroups[selectedCurve][1], faceGroup, ranShiftPhase2, ranShiftAmp2, ctlVal,
-                                                           sampleFace, localiseFlag, ampOrPhase)
-                        else:
-                            self.individualCurveAmpPhaseSample(ctlName, faceGroup, ranShiftPhase, ranShiftAmp, ctlVal,
-                                                               sampleFace, localiseFlag, ampOrPhase)
 
-    def individualCurveAmpPhaseSample(self, curveName, faceGroup, ranSampTime, ranSampVal,
-                                      ctlVal, sampleFace, localiseFlag, ampOrPhase):
+    def individualCurveDenoise(self, curveName, faceGroup, TIME_VAL, THRESHOLD_VAL, sampleFace):
+
+        print "Entered Ind Sample"
+        startTime = self.minSliderTime
+        endTime = self.maxSliderTime
 
         nSId = curveName.find(':')
         if nSId != -1:
@@ -412,41 +430,11 @@ class GUI():
             outTransform = self.OTHER_FACE_IDS % sampleFace
             outTransform = outTransform + curveName
 
-        # cmds.cutKey(outTransform, time=(2, 199), option="keys")
+        cmds.cutKey(outTransform, time=(2, 199), option="keys")
+        cmds.copyKey(curveName, time=(1, 250), option="keys")  # or keys?
+        cmds.pasteKey(outTransform, time=(1, 250), option="replace")
 
-        if not localiseFlag:
-            if ampOrPhase == "Amp":
-                cmds.keyframe(outTransform, time=(2,199), relative=True, valueChange= ranSampVal)
-            if ampOrPhase == "Phase":
-                cmds.keyframe(outTransform, time=(2,199), relative=True, timeChange= ranSampTime)
-
-        else:
-
-            keys = cmds.keyframe(outTransform, time = (2,199), valueChange=True, query=True)
-            times = cmds.keyframe(outTransform, time=(2, 199), timeChange=True, query=True)
-            print keys
-            print times
-
-            cmds.cutKey(outTransform, time=(2, 199), option="keys")
-
-            for keyId, keyVal in enumerate(keys):
-
-                if ampOrPhase == "Amp":
-                    randTime = times[keyId]
-                    randVal = ranSampVal[keyId] * keyVal
-
-
-                if ampOrPhase == "Phase":
-                    randTime = ranSampTime[keyId] * times[keyId]
-                    randVal = keyVal
-
-                    if randTime < 3:
-                        randTime = 3
-
-                    if randTime > 198:
-                        randTime = 198
-
-                cmds.setKeyframe(outTransform, t=(randTime, randTime), v=randVal)
+        cmds.filterCurve(outTransform, filter="simplify", timeTolerance=TIME_VAL, tolerance=THRESHOLD_VAL)
 
 
 
@@ -643,7 +631,10 @@ class GUI():
 
         if not self.CurrentGenePool:
             print "Resampling with Empty Gene Pool"
-            self.sampleNonLinear(2,[1,2,3])
+            if self.NOISE_OR_DENOISE == "NOISE":
+                self.resampleCurvesNoise(1,[1,2,3])
+            elif self.NOISE_OR_DENOISE == "DENOISE":
+                self.resampleCurvesDenoise(1, [1, 2, 3])
 
         else:
             EliteCurves = self.EliteGenes
@@ -682,14 +673,7 @@ class GUI():
                 GROUP_CURVES_THRESHOLD = 0.8
                 SINGLE_CURVE_THRESHOLD = 1.0
 
-                SWAP_AVG_THRESHOLD = 0.7
-                swapAvgCoinFlip = random.random()
-                if swapAvgCoinFlip < SWAP_AVG_THRESHOLD:
-                    breedOperation = "Swap"
-                else:
-                    breedOperation = "Avg"
-
-                print "breedOperation: %s" % breedOperation
+                breedOperation = "Swap"
 
                 whichCurvesCoinFlip = random.random()
 
@@ -713,21 +697,13 @@ class GUI():
 
                 # Curve Modification
 
-                RESAMPLE_THRESHOLD = 0.2
-                CHANGE_AMP_THRESHOLD = 0.3
-                CHANGE_PHASE_THRESHOLD = 0.4
+                RESAMPLE_THRESHOLD= 0.5
                 DO_NOTHING_THRESHOLD = 1.0
 
                 whichOperationCoinFlip = random.random()
 
                 if whichOperationCoinFlip <= RESAMPLE_THRESHOLD:
                     operationChoice = "Resample"
-                    self.modifyCurves(bredCurve,curveChoice,operationChoice, SAMPLE_FACE)
-                elif whichOperationCoinFlip <= CHANGE_AMP_THRESHOLD:
-                    operationChoice = "Amp"
-                    self.modifyCurves(bredCurve, curveChoice, operationChoice, SAMPLE_FACE)
-                elif whichOperationCoinFlip <= CHANGE_PHASE_THRESHOLD:
-                    operationChoice = "Phase"
                     self.modifyCurves(bredCurve, curveChoice, operationChoice, SAMPLE_FACE)
                 else:
                     operationChoice = "Nothing"
@@ -804,9 +780,7 @@ class GUI():
 
         if operationChoice == "Resample":
             print sf
-            self.sampleNonLinear(2, sf)
-        elif operationChoice == "Amp" or operationChoice == "Phase":
-            self.sampleAmpPhase(operationChoice,sf)
+            self.resampleCurvesNoise(1, sf)
 
 
     def setSampleFaceAs(self, bredCurve, SAMPLE_FACE):
