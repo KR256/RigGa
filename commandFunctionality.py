@@ -5,6 +5,8 @@ import random
 import copy
 from functools import partial
 
+import rigGAGUI
+
 class CTLnode():
 
 	def __init__(self,longname, translateName, weightDict, weightMinMax,shortGroupName):
@@ -767,6 +769,7 @@ class Main(om.MPxCommand):
 		self.NEUTRAL_TIME = 0
 		self.STARTING_TIME = 0
 		self.OTHER_FACE_IDS = ""
+		self.RIG_OR_EMULATE = ""
 
 	def doIt(self, args):
 
@@ -778,6 +781,7 @@ class Main(om.MPxCommand):
 		ctlId = argVals[0]
 		self.NEUTRAL_TIME = argVals[1]
 		OTHER_FACE_IDS = argVals[2]
+		self.RIG_OR_EMULATE = argVals[3]
 
 		print "Args... CTLid: %s neutralFrame %i ... other id str %s\n" % (ctlId,self.NEUTRAL_TIME, self.OTHER_FACE_IDS)
 
@@ -812,8 +816,12 @@ class Main(om.MPxCommand):
 
 		print allSymmetryNames
 
-		guiTemp = GUI(CTL_TREE,allStartingWeights,allNeutralWeights,allCurrentGenWeights,
-					  strongestShapes,minMaxWeights,allSymmetryNames,OTHER_FACE_IDS)
+		if self.RIG_OR_EMULATE == "EMULATE":
+			guiTemp = GUI(CTL_TREE,allStartingWeights,allNeutralWeights,allCurrentGenWeights,
+						  strongestShapes,minMaxWeights,allSymmetryNames,OTHER_FACE_IDS)
+		else:
+			guiTemp = rigGAGUI.GUI(CTL_TREE, allStartingWeights, allNeutralWeights, allCurrentGenWeights,
+						  strongestShapes, minMaxWeights, allSymmetryNames, OTHER_FACE_IDS)
 
 
 		# Skeleton working stub
@@ -836,6 +844,8 @@ class Main(om.MPxCommand):
 		neutralLongFlagName = '-neutralFrame'
 		otherFaceIdsLong = '-otherFaceIds'
 		otherFaceIdsShort = '-oid'
+		rigOrEmulateShort = '-roe'
+		rigOrEmulateLong = '-rigOrEmulate'
 
 		# The following MArgParser object allows you to check if specific flags are set.
 		argData = om.MArgParser(self.syntax(), args)
@@ -854,6 +864,10 @@ class Main(om.MPxCommand):
 		if argData.isFlagSet(otherFaceIdsLong):
 			# In this case, we print the passed flags's three parameters, indexed from 0 to 2.
 			flagParams.append(argData.flagArgumentString(otherFaceIdsShort, 0))
+			noFlag = False
+		if argData.isFlagSet(rigOrEmulateLong):
+			# In this case, we print the passed flags's three parameters, indexed from 0 to 2.
+			flagParams.append(argData.flagArgumentString(rigOrEmulateLong, 0))
 			noFlag = False
 		if noFlag:
 			sys.stderr.write(
