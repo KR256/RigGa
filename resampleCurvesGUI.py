@@ -274,9 +274,13 @@ class GUI():
 
     def copyEliteToSamples(self, blendshapeTargetTree, *args):
 
+    	print blendshapeTargetTree
+
         for faceGroup, ctlDict in blendshapeTargetTree.iteritems():
 
             for ctlName, ctlVal in ctlDict.iteritems():
+
+            	print faceGroup + ":" + ctlName
 
                 nSId = ctlName.find(':')
                 if nSId != -1:
@@ -293,9 +297,14 @@ class GUI():
                     print out1
 
                 cmds.copyKey(ctlName, time=(self.minSliderTime, self.maxSliderTime), option="keys")  # or keys?
-                cmds.pasteKey(out1, time=(self.minSliderTime, self.maxSliderTime), option="replace")
-                cmds.pasteKey(out2, time=(self.minSliderTime, self.maxSliderTime), option="replace")
-                cmds.pasteKey(out3, time=(self.minSliderTime, self.maxSliderTime), option="replace")
+                try:
+	                cmds.pasteKey(out1, time=(self.minSliderTime, self.maxSliderTime), option="replace")
+	                cmds.pasteKey(out2, time=(self.minSliderTime, self.maxSliderTime), option="replace")
+	                cmds.pasteKey(out3, time=(self.minSliderTime, self.maxSliderTime), option="replace")
+                except:
+                	"Curve doesn't exist"
+                	continue
+
 
     def resampleCurvesNoise(self, FLAG, chosenFaces, *args):
 
