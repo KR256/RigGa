@@ -190,7 +190,7 @@ class GUI():
         cmds.rowLayout(numberOfColumns=2, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'right', 0)])
         cmds.text("                                ")
-        cmds.text(label="                                ")
+        cmds.checkBox("unconstrainedRandom", editable=True, label="  Constrain", value=True)
         cmds.setParent('..')
 
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
@@ -213,8 +213,8 @@ class GUI():
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)], w=100)
         if self.NOISE_OR_DENOISE == "NOISE":
             cmds.text(label='                S.D: ')
-            cmds.floatSliderGrp("sdVal", field=True, minValue=0.0, maxValue=0.01, fieldMinValue=0.0,
-                            fieldMaxValue=0.01, value=0.01, cw=[(1, 50), (2, 120)])
+            cmds.floatSliderGrp("sdVal", field=True, minValue=0.0, maxValue=0.5, fieldMinValue=0.0,
+                            fieldMaxValue=0.5, value=0.01, cw=[(1, 50), (2, 120)])
         elif self.NOISE_OR_DENOISE == "DENOISE":
             cmds.text(label="           Val Tolerance:")
             cmds.floatField("valTol", minValue=0.0, maxValue=0.1, value=0.01, editable=True)
@@ -292,10 +292,10 @@ class GUI():
                     out3 = (self.OTHER_FACE_IDS + ctlName) % 3
                     print out1
 
-                cmds.copyKey(ctlName, time=(1, 250), option="keys")  # or keys?
-                cmds.pasteKey(out1, time=(1, 250), option="replace")
-                cmds.pasteKey(out2, time=(1, 250), option="replace")
-                cmds.pasteKey(out3, time=(1, 250), option="replace")
+                cmds.copyKey(ctlName, time=(self.minSliderTime, self.maxSliderTime), option="keys")  # or keys?
+                cmds.pasteKey(out1, time=(self.minSliderTime, self.maxSliderTime), option="replace")
+                cmds.pasteKey(out2, time=(self.minSliderTime, self.maxSliderTime), option="replace")
+                cmds.pasteKey(out3, time=(self.minSliderTime, self.maxSliderTime), option="replace")
 
     def resampleCurvesNoise(self, FLAG, chosenFaces, *args):
 
@@ -319,6 +319,7 @@ class GUI():
                 MUTATION_THRESHOLD = cmds.floatSliderGrp("sdThreshold", value=True, query=True)
                 selectedGroup = cmds.optionMenu("controlGroupSourceGroup", value=True, query=True)
                 selectedCurve = cmds.optionMenu("controlGroupSource", value=True, query=True)
+                unconstrainedRandom = cmds.checkBox("unconstrainedRandom", query=True, value=True)
 
             else:
                 SAMPLE_STEP = random.choice([random.randint(1, 5), random.randrange(5, 25, 5)])
@@ -326,6 +327,7 @@ class GUI():
                 MUTATION_THRESHOLD = random.uniform(0.000, 0.002)
                 selectedGroup = 'All'
                 selectedCurve = 'All'
+                unconstrainedRandom = True
 
 
             print "Sample Step %i, Mutate Val %f, Mutate Threshold %f" % (SAMPLE_STEP, MUTATION_VAL, MUTATION_THRESHOLD)
@@ -334,11 +336,11 @@ class GUI():
 
                 for ctlName, ctlVal in ctlDict.iteritems():
 
-                    self.individualCurveSample(ctlName, faceGroup, MUTATION_VAL, SAMPLE_STEP, MUTATION_THRESHOLD, sampleFace)
+                    self.individualCurveSample(ctlName, faceGroup, MUTATION_VAL, SAMPLE_STEP, MUTATION_THRESHOLD, sampleFace,unconstrainedRandom)
 
 
 
-    def individualCurveSample(self, curveName, faceGroup, mutateSD, samplingStep, MUTATION_THRESHOLD, sampleFace):
+    def individualCurveSample(self, curveName, faceGroup, mutateSD, samplingStep, MUTATION_THRESHOLD, sampleFace,unconstrainedRandom):
 
         print "Entered Ind Sample"
         startTime = self.minSliderTime
@@ -351,9 +353,9 @@ class GUI():
             outTransform = self.OTHER_FACE_IDS % sampleFace
             outTransform = outTransform + curveName
 
-        cmds.cutKey(outTransform, time=(2, 199), option="keys")
-        cmds.copyKey(curveName, time=(1, 250), option="keys")  # or keys?
-        cmds.pasteKey(outTransform, time=(1, 250), option="replace")
+        cmds.cutKey(outTransform, time=(self.minSliderTime+1, self.maxSliderTime-1), option="keys")
+        cmds.copyKey(curveName, time=(self.minSliderTime, self.maxSliderTime), option="keys")  # or keys?
+        cmds.pasteKey(outTransform, time=(self.minSliderTime, self.maxSliderTime), option="replace")
 
         for frame in range(startTime + 1, endTime - 1, samplingStep):
 
@@ -366,6 +368,8 @@ class GUI():
             print currentVal
             if ( abs(nextVal[0] - currentVal[0]) < MUTATION_THRESHOLD ):
                 print "Big Random"
+                mutatedVal = random.gauss(currentVal[0], mutateSD)
+            elif not unconstrainedRandom:
                 mutatedVal = random.gauss(currentVal[0], mutateSD)
             else:
                 mutateOrNot = random.uniform(0.0, 1.0)
@@ -430,9 +434,9 @@ class GUI():
             outTransform = self.OTHER_FACE_IDS % sampleFace
             outTransform = outTransform + curveName
 
-        cmds.cutKey(outTransform, time=(2, 199), option="keys")
-        cmds.copyKey(curveName, time=(1, 250), option="keys")  # or keys?
-        cmds.pasteKey(outTransform, time=(1, 250), option="replace")
+        cmds.cutKey(outTransform, time=(self.minSliderTime+1, self.maxSliderTime-1), option="keys")
+        cmds.copyKey(curveName, time=(self.minSliderTime, self.maxSliderTime), option="keys")  # or keys?
+        cmds.pasteKey(outTransform, time=(self.minSliderTime, self.maxSliderTime), option="replace")
 
         cmds.filterCurve(outTransform, filter="simplify", timeTolerance=TIME_VAL, tolerance=THRESHOLD_VAL)
 
@@ -538,9 +542,9 @@ class GUI():
                 else:
                     out1 = (self.OTHER_FACE_IDS + ctlName) % eliteNum
 
-                cmds.cutKey(ctlName, time=(2, 199), option="keys")
-                cmds.copyKey(out1, time=(1, 250), option="keys")  # or keys?
-                cmds.pasteKey(ctlName, time=(1, 250), option="replace")
+                cmds.cutKey(ctlName, time=(self.minSliderTime+1, self.maxSliderTime-1), option="keys")
+                cmds.copyKey(out1, time=(self.minSliderTime, self.maxSliderTime), option="keys")  # or keys?
+                cmds.pasteKey(ctlName, time=(self.minSliderTime, self.maxSliderTime), option="replace")
 
         self.EliteGenes = self.saveFaceCurves()
 
@@ -552,8 +556,8 @@ class GUI():
         for faceGroup, ctlDict in shapeTree.iteritems():
             outGroup = {}
             for ctlName, ctlVal in ctlDict.iteritems():
-                keys = cmds.keyframe(ctlName, time=(1, 250), valueChange=True, query=True)
-                times = cmds.keyframe(ctlName, time=(1, 250), timeChange=True, query=True)
+                keys = cmds.keyframe(ctlName, time=(self.minSliderTime, self.maxSliderTime), valueChange=True, query=True)
+                times = cmds.keyframe(ctlName, time=(self.minSliderTime, self.maxSliderTime), timeChange=True, query=True)
 
                 outGroup[ctlName] = (keys, times)
             outDict[faceGroup] = outGroup
@@ -577,8 +581,8 @@ class GUI():
                 else:
                     out1 = (self.OTHER_FACE_IDS + ctlName) % faceId
 
-                keys = cmds.keyframe(out1, time=(2, 199), valueChange=True, query=True)
-                times = cmds.keyframe(out1, time=(2, 199), timeChange=True, query=True)
+                keys = cmds.keyframe(out1, time=(self.minSliderTime+1, self.maxSliderTime-1), valueChange=True, query=True)
+                times = cmds.keyframe(out1, time=(self.minSliderTime+1, self.maxSliderTime-1), timeChange=True, query=True)
 
                 outGroup[ctlName] = (keys, times)
             outDict[faceGroup] = outGroup
@@ -592,7 +596,7 @@ class GUI():
         outDict = {}
         for faceGroup, ctlDict in lastElite.iteritems():
             for ctlName, ctlVal in ctlDict.iteritems():
-                cmds.cutKey(ctlName, time=(2, 199), option="keys")
+                cmds.cutKey(ctlName, time=(self.minSliderTime+1, self.maxSliderTime-1), option="keys")
                 for keyId, keys in enumerate(ctlVal[0]):
                     times = ctlVal[1][keyId]
 
@@ -798,7 +802,7 @@ class GUI():
                 else:
                     out1 = (self.OTHER_FACE_IDS + ctlName) % SAMPLE_FACE[0]
 
-                cmds.cutKey(out1, time=(2, 199), option="keys")
+                cmds.cutKey(out1, time=(self.minSliderTime+1, self.maxSliderTime-1), option="keys")
 
                 for keyId, keys in enumerate(ctlVal[0]):
                     times = ctlVal[1][keyId]
