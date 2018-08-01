@@ -90,10 +90,10 @@ class GUI():
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="Set Elite:  ")
-        controlGroup = cmds.optionMenu("controlGroup")
+        controlGroup1 = cmds.optionMenu("controlGroup1")
         for key in range(1, 4):
             cmds.menuItem(label="SAMPLE " + str(key))
-        cmds.button(label='    Set    ', command=partial(self.setFaceAsElite))
+        cmds.button(label='    Set    ', command=partial(self.setFaceAsElite,1))
         cmds.setParent('..')
 
         cmds.rowLayout(numberOfColumns=2, adjustableColumn=2, columnAlign=(1, 'right'),
@@ -173,10 +173,10 @@ class GUI():
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="Set Elite:  ")
-        controlGroup = cmds.optionMenu("controlGroup")
+        controlGroup2 = cmds.optionMenu("controlGroup2")
         for key in range(1, 4):
             cmds.menuItem(label="SAMPLE " + str(key))
-        cmds.button(label='    Set    ' , command=partial(self.setFaceAsElite))
+        cmds.button(label='    Set    ' , command=partial(self.setFaceAsElite,2))
         cmds.setParent('..')
         cmds.text("New Curves:", font="boldLabelFont", al="center")
         cmds.text(label='')
@@ -333,8 +333,11 @@ class GUI():
                     else:
                         outTransform = self.OTHER_FACE_IDS % faceID
                         outTransform = outTransform + key2
-
-                cmds.setAttr(outTransform, node)
+                try:
+                    cmds.setAttr(outTransform, node)
+                except:
+                    print "Symmetrical object doesn't exist"
+                    continue
 
     def transferFaceWeights(self,sourceID,targetID):
 
@@ -348,10 +351,10 @@ class GUI():
         for face in range(1,4):
             self.transferFaceWeights(0,face)
 
-    def setFaceAsElite(self,*args):
+    def setFaceAsElite(self,id, *args):
 
         self.lastElite = self.getFaceWeights(self.allStartingWeights,0)
-        eliteChoice = cmds.optionMenu("controlGroup", value=True, query=True)
+        eliteChoice = cmds.optionMenu("controlGroup" + str(id), value=True, query=True)
         eliteNum = int(eliteChoice[-1])
         self.transferFaceWeights(eliteNum,0)
         self.EliteGenes = self.getFaceWeights(self.allStartingWeights, 0)
@@ -360,6 +363,7 @@ class GUI():
 
         lastElite = self.lastElite
         self.setFaceWeights(lastElite, 0)
+        self.EliteGenes = self.getFaceWeights(self.allStartingWeights, 0)
 
     def sampleNewFaces(self, preGuiFlag, chosenFaces, mutateOrSample,*args):
 
@@ -396,14 +400,14 @@ class GUI():
             if mutateOrSample == "Sample":
 
                 self.transferFaceWeights(0,sampleFace)
-                parseTreeWeights = self.getFaceWeights(self.allStartingWeights, 0)
+                parseTree = self.getFaceWeights(self.allStartingWeights, 0)
             else:
-                parseTreeWeights = self.getFaceWeights(self.allStartingWeights, sampleFace)
+                parseTree = self.getFaceWeights(self.allStartingWeights, sampleFace)
 
             print "parseTree"
             print parseTree
-            print "parseTreeWeights"
-            print parseTreeWeights
+            # print "parseTreeWeights"
+            # print parseTreeWeights
 
             for key, value in parseTree.iteritems():
                 if selectedGroup != 'All' and selectedGroup != key:
@@ -413,7 +417,7 @@ class GUI():
                 randKeys = random.sample(list(value), min(numKeys, len(value)))
                 print "RandKeys: %s" % randKeys
                 for ctlKey in randKeys:
-                    currentWeight = parseTreeWeights[key][ctlKey]
+                    currentWeight = parseTree[key][ctlKey]
                     if localiseFlag:
                         randWeight = random.gauss(currentWeight, sdVal)
                     else:
@@ -456,12 +460,14 @@ class GUI():
             outDict = self.getFaceWeights(self.allStartingWeights,face)
             self.NextGenePool.append(outDict)
 
-        print self.NextGenePool
+        print "Next Gene Pool"
+        for ng in self.NextGenePool:
+            print ng
 
 
     def breedNextGen(self, *args):
 
-        self.CurrentGenePool = self.NextGenePool
+        self.CurrentGenePool = copy.deepcopy(self.NextGenePool)
         self.NextGenePool = []
 
         self.sampleCurrentGen()
@@ -480,7 +486,7 @@ class GUI():
 
             for face in range(1,4):
 
-                SAMPLE_FACE = [face]
+                SAMPLE_FACE = face
                 print SAMPLE_FACE
 
                 print "Sampling face: %s" % SAMPLE_FACE
@@ -538,30 +544,27 @@ class GUI():
 
                 self.setFaceWeights(bredCurve, SAMPLE_FACE)
 
-                self.sampleNewFaces(-1, [1, 2, 3], "Mutate")
+
 
                 # Curve Modification
 
-                # RESAMPLE_THRESHOLD = 0.2
-                # CHANGE_AMP_THRESHOLD = 0.3
-                # CHANGE_PHASE_THRESHOLD = 0.4
-                # DO_NOTHING_THRESHOLD = 1.0
-                #
-                # whichOperationCoinFlip = random.random()
-                #
-                # if whichOperationCoinFlip <= RESAMPLE_THRESHOLD:
-                #     operationChoice = "Resample"
-                #     self.modifyCurves(bredCurve,curveChoice,operationChoice, SAMPLE_FACE)
-                # elif whichOperationCoinFlip <= CHANGE_AMP_THRESHOLD:
-                #     operationChoice = "Amp"
-                #     self.modifyCurves(bredCurve, curveChoice, operationChoice, SAMPLE_FACE)
-                # elif whichOperationCoinFlip <= CHANGE_PHASE_THRESHOLD:
-                #     operationChoice = "Phase"
-                #     self.modifyCurves(bredCurve, curveChoice, operationChoice, SAMPLE_FACE)
-                # else:
-                #     operationChoice = "Nothing"
-                #
-                # print "operationChoice: %s" % operationChoice
+                THREE_RESAMPLE = 0.2
+                ONE_RESAMPLE = 0.6
+                DO_NOTHING_THRESHOLD = 1.0
+
+                whichOperationCoinFlip = random.random()
+
+                if whichOperationCoinFlip <= THREE_RESAMPLE:
+                    operationChoice = "Three resample"
+                    cmds.intField("numKeys", value=3, edit=True)
+                elif whichOperationCoinFlip <= ONE_RESAMPLE:
+                    operationChoice = "One resample"
+                    cmds.intField("numKeys", value=1, edit=True)
+                else:
+                    operationChoice = "Nothing"
+
+                print "operationChoice: %s" % operationChoice
+                self.sampleNewFaces(-1, [SAMPLE_FACE], "Mutate")
 
     def breedCurves(self,parent1,parent2,breedOperation,curveChoice):
 
@@ -618,26 +621,26 @@ class GUI():
 
         return outCurves
 
-    def modifyCurves(self, bredCurve, curveChoice, operationChoice, sf):
-        if curveChoice == "Single":
-            curveSelection = random.choice(self.symGroups.keys())
-            groupSelection = "All"
-        elif curveChoice == "Group":
-            groupSelection = random.choice(self.strongestShapesTree.keys())
-            curveSelection = "All"
-        else:
-            curveSelection = "All"
-            groupSelection = "All"
-
-        print "Group: %s, Curve: %s" % (groupSelection, curveSelection)
-        cmds.optionMenu("controlGroupSourceGroup", edit=True, value = groupSelection)
-        cmds.optionMenu("controlGroupSource", edit=True, value=curveSelection)
-
-        if operationChoice == "Resample":
-            print sf
-            self.sampleNonLinear(2, sf)
-        elif operationChoice == "Amp" or operationChoice == "Phase":
-            self.sampleAmpPhase(operationChoice,sf)
+    # def modifyCurves(self, bredCurve, curveChoice, operationChoice, sf):
+    #     if curveChoice == "Single":
+    #         curveSelection = random.choice(self.symGroups.keys())
+    #         groupSelection = "All"
+    #     elif curveChoice == "Group":
+    #         groupSelection = random.choice(self.strongestShapesTree.keys())
+    #         curveSelection = "All"
+    #     else:
+    #         curveSelection = "All"
+    #         groupSelection = "All"
+    #
+    #     print "Group: %s, Curve: %s" % (groupSelection, curveSelection)
+    #     cmds.optionMenu("controlGroupSourceGroup", edit=True, value = groupSelection)
+    #     cmds.optionMenu("controlGroupSource", edit=True, value=curveSelection)
+    #
+    #     if operationChoice == "Resample":
+    #         print sf
+    #         self.sampleNonLinear(2, sf)
+    #     elif operationChoice == "Amp" or operationChoice == "Phase":
+    #         self.sampleAmpPhase(operationChoice,sf)
 
 
 

@@ -97,10 +97,10 @@ class GUI():
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="Set Elite:  ")
-        controlGroup = cmds.optionMenu("controlGroup")
+        controlGroup1 = cmds.optionMenu("controlGroup1")
         for key in range(1, 4):
             cmds.menuItem(label="SAMPLE " + str(key))
-        cmds.button(label='    Set    ', command=partial(self.setFaceAsElite))
+        cmds.button(label='    Set    ', command=partial(self.setFaceAsElite,1))
         cmds.setParent('..')
 
         cmds.rowLayout(numberOfColumns=2, adjustableColumn=2, columnAlign=(1, 'right'),
@@ -180,10 +180,10 @@ class GUI():
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="Set Elite:  ")
-        controlGroup = cmds.optionMenu("controlGroup")
+        controlGroup2 = cmds.optionMenu("controlGroup2")
         for key in range(1, 4):
             cmds.menuItem(label="SAMPLE " + str(key))
-        cmds.button(label='    Set    ', command=partial(self.setFaceAsElite))
+        cmds.button(label='    Set    ', command=partial(self.setFaceAsElite,2))
         cmds.setParent('..')
         cmds.text("Resample Timestep:", font="boldLabelFont", al="center")
         cmds.text("Resample Noise:", font="boldLabelFont", al="center")
@@ -530,11 +530,11 @@ class GUI():
         self.symGroups = returnDict
         return returnList
 
-    def setFaceAsElite(self, *args):
+    def setFaceAsElite(self, id,*args):
 
         self.lastElite = self.saveFaceCurves()
 
-        eliteChoice = cmds.optionMenu("controlGroup", value=True, query=True)
+        eliteChoice = cmds.optionMenu("controlGroup" + str(id), value=True, query=True)
         eliteNum = int(eliteChoice[-1])
 
         shapeTree = self.strongestShapesTree
