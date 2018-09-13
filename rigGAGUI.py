@@ -34,7 +34,7 @@ class GUI():
         self.OTHER_FACE_IDS = OTHER_FACE_IDS
         self.originalStrongest = strongestShapes
         self.symGroups = {}
-        self.lastElite = {}
+        self.lastElite = []
         self.NextGenePool = []
         self.CurrentGenePool = []
         self.EliteGenes = []
@@ -72,7 +72,7 @@ class GUI():
 
         #self.linearBlendshape(self.strongestShapesTree)
         self.EliteGenes = self.getFaceWeights(self.allStartingWeights, 0)
-        self.lastElite = self.getFaceWeights(self.allStartingWeights, 0)
+        self.lastElite.append(self.getFaceWeights(self.allStartingWeights, 0))
         #self.sampleNonLinear(2,[1,2,3])
 
         self.sampleNewFaces(1, [1,2,3], "Sample")
@@ -360,7 +360,7 @@ class GUI():
 
     def setFaceAsElite(self,id, *args):
 
-        self.lastElite = self.getFaceWeights(self.allStartingWeights,0)
+        self.lastElite.append(self.getFaceWeights(self.allStartingWeights,0))
         eliteChoice = cmds.optionMenu("controlGroup" + str(id), value=True, query=True)
         eliteNum = int(eliteChoice[-1])
         self.transferFaceWeights(eliteNum,0)
@@ -372,15 +372,20 @@ class GUI():
         # print "Current EliteGenErrors %f" % self.EliteGenErrors
 
         if self.AUTOMATE and (len(self.EliteGenErrors) == 1):
-            self.automateRoutine(10,5)
+            self.lastElite.append(self.getFaceWeights(self.allStartingWeights,0))
+            self.automateRoutine(5,5)
 
 
 
     def resetToLastElite(self, *args):
 
-        lastElite = self.lastElite
-        self.setFaceWeights(lastElite, 0)
-        self.EliteGenes = self.getFaceWeights(self.allStartingWeights, 0)
+        if len(self.lastElite) > 0:
+            lastElite = self.lastElite[-1]
+            self.lastElite = self.lastElite[:-1]
+            self.setFaceWeights(lastElite, 0)
+            self.EliteGenes = self.getFaceWeights(self.allStartingWeights, 0)
+        else:
+            print "First Elite Reached"
 
 
 
@@ -408,9 +413,14 @@ class GUI():
     def getSampledMeshError(self):
 
         targetVerts = self.STARTING_MESH_VERTS
-        mesh1 = self.getVertexPositions(1)
-        mesh2 = self.getVertexPositions(2)
-        mesh3 = self.getVertexPositions(3)
+        self.transferFaceWeights(1,0)
+        mesh1 = self.getVertexPositions(0)
+        self.transferFaceWeights(2,0)
+        mesh2 = self.getVertexPositions(0)
+        self.transferFaceWeights(3,0)
+        mesh3 = self.getVertexPositions(0)
+
+        self.setFaceWeights(self.lastElite[-1], 0)
 
         mesh1Error = abs(np.array(targetVerts) - np.array(mesh1)).sum()
         mesh2Error = abs(np.array(targetVerts) - np.array(mesh2)).sum()
@@ -463,6 +473,8 @@ class GUI():
                 print "Changing bestSampleVal"
                 eliteTree = self.NextGenePool[bestSample]
                 self.setFaceWeights(eliteTree, 0)
+                self.lastElite.append(self.getFaceWeights(self.allStartingWeights,0))
+
                 mesh1 = self.getVertexPositions(0)
                 mesh1Error = abs(np.array(self.STARTING_MESH_VERTS) - np.array(mesh1)).sum()
                 print "Check bestSampleVal:%f = mesh1Error:%f " % (bestSampleVal, mesh1Error)
@@ -476,6 +488,11 @@ class GUI():
 
         print "EliteGenErrors:"
         print self.EliteGenErrors
+
+        self.resetToLastElite()
+        mesh1 = self.getVertexPositions(0)
+        mesh1Error = abs(np.array(self.STARTING_MESH_VERTS) - np.array(mesh1)).sum()
+        print "mesh1Error:%f " % (mesh1Error)
 
 
 
