@@ -770,6 +770,7 @@ class Main(om.MPxCommand):
 		self.STARTING_TIME = 0
 		self.OTHER_FACE_IDS = ""
 		self.RIG_OR_EMULATE = ""
+		# self.MESH_NAME = ""
 
 	def doIt(self, args):
 
@@ -782,6 +783,8 @@ class Main(om.MPxCommand):
 		self.NEUTRAL_TIME = argVals[1]
 		OTHER_FACE_IDS = argVals[2]
 		self.RIG_OR_EMULATE = argVals[3]
+		MESH_NAME = argVals[4]
+		# AUTOMATE = argVals[5]
 
 		print "Args... CTLid: %s neutralFrame %i ... other id str %s\n" % (ctlId,self.NEUTRAL_TIME, self.OTHER_FACE_IDS)
 
@@ -814,14 +817,21 @@ class Main(om.MPxCommand):
 
 		allSymmetryNames = self.getSymmetryNames(CTL_TREE)
 
+
 		print allSymmetryNames
+
+		# AUTOMATE_FLAG = False
+		# # if AUTOMATE == "Automate":
+        #
+		# AUTOMATE_FLAG = True
+
 
 		if self.RIG_OR_EMULATE == "EMULATE":
 			guiTemp = GUI(CTL_TREE,allStartingWeights,allNeutralWeights,allCurrentGenWeights,
 						  strongestShapes,minMaxWeights,allSymmetryNames,OTHER_FACE_IDS)
 		else:
 			guiTemp = rigGAGUI.GUI(CTL_TREE, allStartingWeights, allNeutralWeights, allCurrentGenWeights,
-						  strongestShapes, minMaxWeights, allSymmetryNames, OTHER_FACE_IDS)
+						  strongestShapes, minMaxWeights, allSymmetryNames, OTHER_FACE_IDS,MESH_NAME)
 
 
 		# Skeleton working stub
@@ -846,6 +856,9 @@ class Main(om.MPxCommand):
 		otherFaceIdsShort = '-oid'
 		rigOrEmulateShort = '-roe'
 		rigOrEmulateLong = '-rigOrEmulate'
+		meshNeutralNameShort = '-mNN'
+		meshNeutralNameLong = '-meshNeutralName'
+
 
 		# The following MArgParser object allows you to check if specific flags are set.
 		argData = om.MArgParser(self.syntax(), args)
@@ -868,6 +881,10 @@ class Main(om.MPxCommand):
 		if argData.isFlagSet(rigOrEmulateLong):
 			# In this case, we print the passed flags's three parameters, indexed from 0 to 2.
 			flagParams.append(argData.flagArgumentString(rigOrEmulateLong, 0))
+			noFlag = False
+		if argData.isFlagSet(meshNeutralNameLong):
+			# In this case, we print the passed flags's three parameters, indexed from 0 to 2.
+			flagParams.append(argData.flagArgumentString(meshNeutralNameLong, 0))
 			noFlag = False
 		if noFlag:
 			sys.stderr.write(

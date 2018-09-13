@@ -47,6 +47,8 @@ def syntaxCreator():
     otherFaceIdsShort = '-oid'
     rigOrEmulateShort = '-roe'
     rigOrEmulateLong = '-rigOrEmulate'
+    meshNeutralNameShort = '-mNN'
+    meshNeutralNameLong = '-meshNeutralName'
     syntax = om.MSyntax()
 
     # In this example, our flag will be expecting a numeric value, denoted by OpenMaya.MSyntax.kDouble.
@@ -54,6 +56,7 @@ def syntaxCreator():
     syntax.addFlag(neutralShortFlagName, neutralLongFlagName, om.MSyntax.kDouble)
     syntax.addFlag(otherFaceIdsShort, otherFaceIdsLong, om.MSyntax.kString)
     syntax.addFlag(rigOrEmulateShort, rigOrEmulateLong, om.MSyntax.kString)
+    syntax.addFlag(meshNeutralNameShort, meshNeutralNameLong, om.MSyntax.kString)
 
     # ... Add more flags here ...
 

@@ -2,6 +2,7 @@ import sys
 import maya.api.OpenMaya as om
 import maya.cmds as cmds
 import random
+import numpy as np
 from sets import Set
 from functools import partial
 import copy
@@ -12,7 +13,8 @@ import copy
 class GUI():
 
     def __init__(self, CTL_TREE,allStartingWeights,allNeutralWeights,
-                 allCurrentGenWeights, strongestShapes, minMaxWeights, allSymmetryNames,OTHER_FACE_IDS):
+                 allCurrentGenWeights, strongestShapes, minMaxWeights, allSymmetryNames,
+                 OTHER_FACE_IDS,MESH_NAME):
 
         self.ctlTree = CTL_TREE
         self.allStartingWeights = allStartingWeights
@@ -36,6 +38,11 @@ class GUI():
         self.NextGenePool = []
         self.CurrentGenePool = []
         self.EliteGenes = []
+        self.MESH_NAME = MESH_NAME
+        self.EliteGenErrors = []
+        self.AUTOMATE = True
+
+        self.STARTING_MESH_VERTS = self.getVertexPositions(0)
 
         print "strongestShapes"
         print strongestShapes
@@ -132,7 +139,7 @@ class GUI():
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
                        columnAttach=[(1, 'left', 0), (2, 'both', 0), (3, 'right', 0)])
         cmds.text(label="                 ")
-        cmds.button(label='Add Selected to Gene Pool' , command=partial(self.addToGenePool))
+        cmds.button(label='Add Selected to Gene Pool' , command=partial(self.addToGenePool, 0))
         cmds.text(label="                 ")
         cmds.setParent('..')
         cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnAlign=(1, 'right'),
@@ -336,7 +343,7 @@ class GUI():
                 try:
                     cmds.setAttr(outTransform, node)
                 except:
-                    print "Symmetrical object doesn't exist"
+                    # print "Symmetrical object doesn't exist"
                     continue
 
     def transferFaceWeights(self,sourceID,targetID):
@@ -344,7 +351,7 @@ class GUI():
         CTL_tree = self.allStartingWeights
         sourceTree = self.getFaceWeights(CTL_tree,sourceID)
         self.setFaceWeights(sourceTree,targetID)
-        print "Transferring FACE %i to FACE %i" % (sourceID, targetID)
+        # print "Transferring FACE %i to FACE %i" % (sourceID, targetID)
 
     def copyEliteToSamples(self,*args):
 
@@ -359,11 +366,119 @@ class GUI():
         self.transferFaceWeights(eliteNum,0)
         self.EliteGenes = self.getFaceWeights(self.allStartingWeights, 0)
 
+        errorWeights = self.getSampledMeshError()
+        self.EliteGenErrors.append(errorWeights[eliteNum-1])
+
+        # print "Current EliteGenErrors %f" % self.EliteGenErrors
+
+        if self.AUTOMATE and (len(self.EliteGenErrors) == 1):
+            self.automateRoutine(10,5)
+
+
+
     def resetToLastElite(self, *args):
 
         lastElite = self.lastElite
         self.setFaceWeights(lastElite, 0)
         self.EliteGenes = self.getFaceWeights(self.allStartingWeights, 0)
+
+
+
+    def getVertexPositions(self, faceID):
+
+        meshName = self.MESH_NAME
+        if faceID != 0:
+            nSId = meshName.find(':')
+            if nSId != -1:
+                meshName = meshName[:nSId] + str(faceID) + meshName[nSId:]
+            else:
+                outTransform = self.OTHER_FACE_IDS % faceID
+                meshName = outTransform + meshName
+
+        numVerts = cmds.polyEvaluate(meshName, v=True)
+        # print meshName
+        pointPositions = []
+        for i in range(numVerts):
+            p = cmds.pointPosition('%s.vtx[%i]' % (meshName,i), l=True)
+            pointPositions.append(p)
+
+        return pointPositions
+
+
+    def getSampledMeshError(self):
+
+        targetVerts = self.STARTING_MESH_VERTS
+        mesh1 = self.getVertexPositions(1)
+        mesh2 = self.getVertexPositions(2)
+        mesh3 = self.getVertexPositions(3)
+
+        mesh1Error = abs(np.array(targetVerts) - np.array(mesh1)).sum()
+        mesh2Error = abs(np.array(targetVerts) - np.array(mesh2)).sum()
+        mesh3Error = abs(np.array(targetVerts) - np.array(mesh3)).sum()
+
+        print "Sample errors:"
+        print "%f %f %f" % (mesh1Error,mesh2Error,mesh3Error)
+
+        return [mesh1Error,mesh2Error,mesh3Error]
+
+    def automateRoutine(self, numGens, numSamps):
+
+        for gen in range(numGens):
+
+            print "Processing Current Gen %i" % (gen+1)
+
+            print "Current EliteGenErrors :"
+            print self.EliteGenErrors
+            currentBestSSE = self.EliteGenErrors[gen]
+            print "currentBestSSE %f" % currentBestSSE
+            currentGenePoolErrors = []
+            sample = 1
+            threshold = 1.1
+            while len(currentGenePoolErrors) <= numSamps:
+
+                print "Sample: %i" % (sample+1)
+                self.sampleCurrentGen()
+                sampleErrors = self.getSampledMeshError()
+
+                for s,val in enumerate(sampleErrors):
+                    if val < (currentBestSSE*threshold):
+                        self.addToGenePool([s+1])
+                        currentGenePoolErrors.append(val)
+
+                sample = sample + 1
+
+                if sample > 20:
+                    threshold = threshold + 0.2
+                    sample = 1
+
+            # print "NextGenePool:"
+            # print self.NextGenePool
+            print "currentPoolErrors:"
+            print currentGenePoolErrors
+
+            bestSample = np.argmin(currentGenePoolErrors)
+            bestSampleVal = currentGenePoolErrors[bestSample]
+            print "bestSampleVal: %f" % bestSampleVal
+            if(bestSampleVal < currentBestSSE):
+                print "Changing bestSampleVal"
+                eliteTree = self.NextGenePool[bestSample]
+                self.setFaceWeights(eliteTree, 0)
+                mesh1 = self.getVertexPositions(0)
+                mesh1Error = abs(np.array(self.STARTING_MESH_VERTS) - np.array(mesh1)).sum()
+                print "Check bestSampleVal:%f = mesh1Error:%f " % (bestSampleVal, mesh1Error)
+                self.EliteGenes = self.getFaceWeights(self.allStartingWeights, 0)
+                self.EliteGenErrors.append(bestSampleVal)
+
+            else:
+                self.EliteGenErrors.append(currentBestSSE)
+
+            self.breedNextGen()
+
+        print "EliteGenErrors:"
+        print self.EliteGenErrors
+
+
+
 
     def sampleNewFaces(self, preGuiFlag, chosenFaces, mutateOrSample,*args):
 
@@ -404,8 +519,8 @@ class GUI():
             else:
                 parseTree = self.getFaceWeights(self.allStartingWeights, sampleFace)
 
-            print "parseTree"
-            print parseTree
+            # print "parseTree"
+            # print parseTree
             # print "parseTreeWeights"
             # print parseTreeWeights
 
@@ -415,7 +530,7 @@ class GUI():
                 if not value:
                     continue
                 randKeys = random.sample(list(value), min(numKeys, len(value)))
-                print "RandKeys: %s" % randKeys
+                # print "RandKeys: %s" % randKeys
                 for ctlKey in randKeys:
                     currentWeight = parseTree[key][ctlKey]
                     if localiseFlag:
@@ -431,30 +546,39 @@ class GUI():
                         except:
                             continue
                         if (opposite == ctlKey) and (ctlKey[-1] == 'X'):
-                            print "Key: %s, Opposite: %s" % (ctlKey, opposite)
+                            # print "Key: %s, Opposite: %s" % (ctlKey, opposite)
                             continue
                         if ctlKey[-1] == 'Y':
                             parseTree[key][opposite] = randWeight
                         elif ctlKey[-1] == 'X':
                             parseTree[key][opposite] = randWeight * -1
-                        else:
-                            print "Error with symmetry"
+                        # else:
+                            # print "Error with symmetry"
 
                     parseTree[key][ctlKey] = randWeight
                     self.setFaceWeights(parseTree,sampleFace)
 
+        # errorWeights = self.getSampledMeshError()
 
-    def addToGenePool(self, *args):
 
-        face1cB = cmds.checkBox("face1cB", value=True, query=True)
-        face2cB = cmds.checkBox("face2cB", value=True, query=True)
-        face3cB = cmds.checkBox("face3cB", value=True, query=True)
+    def addToGenePool(self, faceID, *args):
 
         faceToAdd = []
 
-        if face1cB: faceToAdd.append(1)
-        if face2cB: faceToAdd.append(2)
-        if face3cB: faceToAdd.append(3)
+        if faceID == 0:
+
+            face1cB = cmds.checkBox("face1cB", value=True, query=True)
+            face2cB = cmds.checkBox("face2cB", value=True, query=True)
+            face3cB = cmds.checkBox("face3cB", value=True, query=True)
+
+
+            if face1cB: faceToAdd.append(1)
+            if face2cB: faceToAdd.append(2)
+            if face3cB: faceToAdd.append(3)
+
+        else:
+
+            faceToAdd = faceID
 
         for face in faceToAdd:
             outDict = self.getFaceWeights(self.allStartingWeights,face)
@@ -475,7 +599,7 @@ class GUI():
     def sampleCurrentGen(self, *args):
 
         if not self.CurrentGenePool:
-            print "Resampling with Empty Gene Pool"
+            # print "Resampling with Empty Gene Pool"
             self.sampleNewFaces(-1,[1,2,3], "Sample")
 
         else:
@@ -487,9 +611,9 @@ class GUI():
             for face in range(1,4):
 
                 SAMPLE_FACE = face
-                print SAMPLE_FACE
+                # print SAMPLE_FACE
 
-                print "Sampling face: %s" % SAMPLE_FACE
+                # print "Sampling face: %s" % SAMPLE_FACE
 
                 # Parent handling
                 ELITE_THRESHOLD = 0.5
@@ -497,17 +621,17 @@ class GUI():
                 eliteCoinFlip = random.random()
 
                 if eliteCoinFlip < ELITE_THRESHOLD:
-                    print "Elite"
+                    # print "Elite"
                     parent1 = EliteCurves
                     parent2 = random.sample(currentGenePool,1)
                     parent2 = parent2[0]
                 else:
                     parent1,parent2 = random.sample(currentGenePool,2)
 
-                print "Parent 1:"
-                print parent1
-                print "Parent 2:"
-                print parent2
+                # print "Parent 1:"
+                # print parent1
+                # print "Parent 2:"
+                # print parent2
 
                 #Curve Group Selection
 
@@ -522,7 +646,7 @@ class GUI():
                 else:
                     breedOperation = "Avg"
 
-                print "breedOperation: %s" % breedOperation
+                # print "breedOperation: %s" % breedOperation
 
                 whichCurvesCoinFlip = random.random()
 
@@ -536,10 +660,10 @@ class GUI():
                     curveChoice = "Single"
                     bredCurve = self.breedCurves(parent1, parent2, breedOperation, curveChoice)
 
-                print "curveChoice: %s" % curveChoice
-
-                print "bredCurve:"
-                print bredCurve
+                # print "curveChoice: %s" % curveChoice
+                #
+                # print "bredCurve:"
+                # print bredCurve
 
 
                 self.setFaceWeights(bredCurve, SAMPLE_FACE)
@@ -548,28 +672,30 @@ class GUI():
 
                 # Curve Modification
 
-                THREE_RESAMPLE = 0.2
-                ONE_RESAMPLE = 0.6
-                DO_NOTHING_THRESHOLD = 1.0
+                # THREE_RESAMPLE = 0.2
+                # ONE_RESAMPLE = 0.6
+                # DO_NOTHING_THRESHOLD = 1.0
+                #
+                # whichOperationCoinFlip = random.random()
+                #
+                # if whichOperationCoinFlip <= THREE_RESAMPLE:
+                #     operationChoice = "Three resample"
+                #     cmds.intField("numKeys", value=3, edit=True)
+                # elif whichOperationCoinFlip <= ONE_RESAMPLE:
+                #     operationChoice = "One resample"
+                #     cmds.intField("numKeys", value=1, edit=True)
+                # else:
+                #     operationChoice = "Nothing"
 
-                whichOperationCoinFlip = random.random()
-
-                if whichOperationCoinFlip <= THREE_RESAMPLE:
-                    operationChoice = "Three resample"
-                    cmds.intField("numKeys", value=3, edit=True)
-                elif whichOperationCoinFlip <= ONE_RESAMPLE:
-                    operationChoice = "One resample"
-                    cmds.intField("numKeys", value=1, edit=True)
-                else:
-                    operationChoice = "Nothing"
-
-                print "operationChoice: %s" % operationChoice
+                # print "operationChoice: %s" % operationChoice
                 self.sampleNewFaces(-1, [SAMPLE_FACE], "Mutate")
+
+        errorWeights = self.getSampledMeshError()
 
     def breedCurves(self,parent1,parent2,breedOperation,curveChoice):
 
         outCurves = copy.deepcopy(parent1)
-        print outCurves
+        # print outCurves
 
         # if curveChoice == "Single":
         #     curveSelection = random.choice(self.symGroups.keys())
@@ -585,7 +711,7 @@ class GUI():
 
             if curveChoice == "Group":
                 if (faceGroup == groupSelection) and (curveSelection == "All"):
-                    print "Swapping Groups: %s" % faceGroup
+                    # print "Swapping Groups: %s" % faceGroup
                     outCurves[faceGroup] = parent2[faceGroup]
             # elif curveSelection != "All":
             #
@@ -601,7 +727,7 @@ class GUI():
                     if breedOperation == "Swap":
                         coinFlip = random.random()
                         if coinFlip < 0.5:
-                            print "Swapping All Curves"
+                            # print "Swapping All Curves"
                             outCurves[faceGroup][ctlName] = parent2[faceGroup][ctlName]
                             try:
                                 outCurves[faceGroup][self.allSymmetryNames[faceGroup][ctlName]] = parent2[faceGroup][self.allSymmetryNames[faceGroup][ctlName]]
@@ -611,7 +737,7 @@ class GUI():
                     else:
                         # for keyId, keys in enumerate(ctlVal[0]):
 
-                        print "Averaging curves"
+                        # print "Averaging curves"
 
                         outCurves[faceGroup][ctlName] = (ctlVal + parent2[faceGroup][ctlName]) / 2
                         try:
