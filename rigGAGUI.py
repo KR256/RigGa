@@ -14,7 +14,7 @@ class GUI():
 
     def __init__(self, CTL_TREE,allStartingWeights,allNeutralWeights,
                  allCurrentGenWeights, strongestShapes, minMaxWeights, allSymmetryNames,
-                 OTHER_FACE_IDS,MESH_NAME):
+                 OTHER_FACE_IDS,MESH_NAME,AUTOMATE):
 
         self.ctlTree = CTL_TREE
         self.allStartingWeights = allStartingWeights
@@ -40,7 +40,7 @@ class GUI():
         self.EliteGenes = []
         self.MESH_NAME = MESH_NAME
         self.EliteGenErrors = []
-        self.AUTOMATE = True
+        self.AUTOMATE = AUTOMATE
 
         self.STARTING_MESH_VERTS = self.getVertexPositions(0)
 
@@ -366,8 +366,9 @@ class GUI():
         self.transferFaceWeights(eliteNum,0)
         self.EliteGenes = self.getFaceWeights(self.allStartingWeights, 0)
 
-        errorWeights = self.getSampledMeshError()
-        self.EliteGenErrors.append(errorWeights[eliteNum-1])
+        if self.AUTOMATE:
+            errorWeights = self.getSampledMeshError()
+            self.EliteGenErrors.append(errorWeights[eliteNum-1])
 
         # print "Current EliteGenErrors %f" % self.EliteGenErrors
 

@@ -286,6 +286,8 @@ class GUI():
 		print "New all current gen weights: %s" % self.allCurrentGenWeights
 		print "New all starting weights: %s" % self.allStartingWeights
 
+		self.setKeyframe()
+
 	def addCurrentToSelection(self, *args):
 		currentTree = self.getCurrentWeights()
 		self.generationSelection.append(currentTree)
@@ -431,6 +433,15 @@ class GUI():
 					returnTree[keys][keys2] = tree2[keys][keys2]
 
 		return returnTree
+
+	def setKeyframe(self,*args):
+		currentTree = self.getCurrentWeights()
+		for key1, vals1 in currentTree.iteritems():
+			for key2 in vals1:
+				cmds.setKeyframe(key2)
+
+		cT = cmds.currentTime( query=True )
+		cmds.currentTime(cT + 50)
 
 	def setKeyframes(self, *args):
 		currentTree = self.getCurrentWeights()
@@ -784,7 +795,7 @@ class Main(om.MPxCommand):
 		OTHER_FACE_IDS = argVals[2]
 		self.RIG_OR_EMULATE = argVals[3]
 		MESH_NAME = argVals[4]
-		# AUTOMATE = argVals[5]
+		AUTOMATE = argVals[5]
 
 		print "Args... CTLid: %s neutralFrame %i ... other id str %s\n" % (ctlId,self.NEUTRAL_TIME, self.OTHER_FACE_IDS)
 
@@ -831,7 +842,7 @@ class Main(om.MPxCommand):
 						  strongestShapes,minMaxWeights,allSymmetryNames,OTHER_FACE_IDS)
 		else:
 			guiTemp = rigGAGUI.GUI(CTL_TREE, allStartingWeights, allNeutralWeights, allCurrentGenWeights,
-						  strongestShapes, minMaxWeights, allSymmetryNames, OTHER_FACE_IDS,MESH_NAME)
+						  strongestShapes, minMaxWeights, allSymmetryNames, OTHER_FACE_IDS,MESH_NAME,AUTOMATE)
 
 
 		# Skeleton working stub
@@ -858,6 +869,8 @@ class Main(om.MPxCommand):
 		rigOrEmulateLong = '-rigOrEmulate'
 		meshNeutralNameShort = '-mNN'
 		meshNeutralNameLong = '-meshNeutralName'
+		automateShort = '-aut'
+		automateLong = '-automate'
 
 
 		# The following MArgParser object allows you to check if specific flags are set.
@@ -885,6 +898,10 @@ class Main(om.MPxCommand):
 		if argData.isFlagSet(meshNeutralNameLong):
 			# In this case, we print the passed flags's three parameters, indexed from 0 to 2.
 			flagParams.append(argData.flagArgumentString(meshNeutralNameLong, 0))
+			noFlag = False
+		if argData.isFlagSet(automateLong):
+			# In this case, we print the passed flags's three parameters, indexed from 0 to 2.
+			flagParams.append(argData.flagArgumentBool(automateLong, 0))
 			noFlag = False
 		if noFlag:
 			sys.stderr.write(
